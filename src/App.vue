@@ -25,7 +25,6 @@
               <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
             </svg>
           </button>
-          <install-button />
         </div>
         <user-dropdown
           :user="user"
@@ -89,10 +88,8 @@ import UserDropdown from './components/UserDropdown.vue';
 import ProjectModal from './components/ProjectModal.vue';
 import ChangelogSidesheet from './components/ChangelogSidesheet.vue';
 import LandingPage from './components/LandingPage.vue';
-import TaskCard from './components/TaskCard.vue';
 import DraggableColumn from './components/DraggableColumn.vue';
 import AppUpdateNotification from './components/AppUpdateNotification.vue';
-import InstallButton from './components/InstallButton.vue';
 
 export default {
   name: 'App',
@@ -102,10 +99,8 @@ export default {
     ProjectModal, 
     ChangelogSidesheet, 
     LandingPage,
-    TaskCard,
     DraggableColumn,
-    AppUpdateNotification,
-    InstallButton
+    AppUpdateNotification
   },
   data() {
     return {

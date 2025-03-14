@@ -48,41 +48,48 @@
         </div>
         
         <div class="mb-4 relative">
-          <span class="field-label">Assignees</span>
-          <div class="assignee-selector">
-            <div v-if="localTask.assignees.length > 0" class="assignee-chips">
-              <div
-                v-for="assignee in localTask.assignees"
-                :key="assignee"
-                class="assignee-chip"
-              >
-                <span>{{ assignee }}</span>
-                <button
-                  @click="removeAssignee(assignee)"
-                  class="remove-assignee"
-                >
-                  ×
-                </button>
+          <div class="assignee-section">
+            <button 
+              @click.stop="toggleAssigneeDropdown" 
+              class="assign-button"
+            >
+              Assign
+              <svg xmlns="http://www.w3.org/2000/svg" class="plus-icon" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" />
+              </svg>
+            </button>
+            <div class="assignee-container">
+              <div v-if="localTask.assignees.length > 0" class="assignee-chips">
+                <assignee-chip
+                  v-for="email in localTask.assignees"
+                  :key="email"
+                  :email="email"
+                  :removable="true"
+                  @remove="removeAssignee"
+                />
+              </div>
+              <div v-else class="no-assignees">
+                <span>No one assigned</span>
               </div>
             </div>
-            <div class="assignee-dropdown">
-              <input 
-                v-model="assigneeSearch" 
-                placeholder="Add assignees" 
-                class="form-input assignee-input" 
-                @focus="showAssigneeDropdown = true"
-                @input="filterAvailableAssignees"
-              />
-              <div v-if="showAssigneeDropdown && filteredAvailableAssignees.length > 0" class="dropdown-menu">
-                <div 
-                  v-for="email in filteredAvailableAssignees" 
-                  :key="email"
-                  @click="addAssignee(email)"
-                  class="dropdown-item"
-                >
-                  {{ email }}
-                </div>
+          </div>
+          <div v-if="showAssigneeDropdown" class="assignee-popover">
+            <div v-if="availableAssigneesToShow.length > 0" class="assignee-list">
+              <div 
+                v-for="email in availableAssigneesToShow" 
+                :key="email"
+                @click.stop="addAssignee(email)"
+                class="assignee-list-item"
+              >
+                <assignee-chip
+                  :email="email"
+                  :removable="false"
+                  class="popover-chip"
+                />
               </div>
+            </div>
+            <div v-else class="no-results">
+              All available users are already assigned
             </div>
           </div>
         </div>
@@ -127,12 +134,13 @@
 </template>
 
 <script>
-import { ref, onMounted, onBeforeUnmount } from 'vue';
+import { ref, onMounted, onBeforeUnmount, watch, nextTick, computed } from 'vue';
 import { Dialog, DialogPanel, DialogTitle } from '@headlessui/vue';
 import { TrashIcon } from '@heroicons/vue/24/outline';
 import { doc, deleteDoc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import debounce from 'lodash/debounce';
+import AssigneeChip from './AssigneeChip.vue';
 
 export default {
   name: 'TaskModal',
@@ -140,7 +148,8 @@ export default {
     Dialog,
     DialogPanel,
     DialogTitle,
-    TrashIcon
+    TrashIcon,
+    AssigneeChip
   },
   props: ['task', 'boardId'],
   setup(props, { emit }) {
@@ -149,25 +158,31 @@ export default {
       assignees: props.task.assignees || [],
       completedAt: props.task.completedAt || null,
     });
-    const assigneesInput = ref((props.task.assignees || []).join(', '));
     const statuses = ['backlog', 'ready', 'in-progress', 'review', 'qa', 'done'];
     const showDeleteConfirmation = ref(false);
     const showAssigneeDropdown = ref(false);
-    const assigneeSearch = ref('');
-    const filteredAvailableAssignees = ref([]);
     const availableAssignees = ref([]);
     const projectOwnerEmail = ref('');
     const projectCollaborators = ref([]);
     const titleTextarea = ref(null);
     const descriptionTextarea = ref(null);
 
+    // Computed property to get available assignees that aren't already assigned
+    const availableAssigneesToShow = computed(() => {
+      return availableAssignees.value.filter(email => 
+        !localTask.value.assignees.includes(email)
+      );
+    });
+
     onMounted(async () => {
       await fetchProjectData();
-      document.addEventListener('click', closeDropdownOnClickOutside);
+      document.addEventListener('click', closeDropdownOnClickOutside, true);
+      adjustTextareaHeight(titleTextarea.value);
+      adjustTextareaHeight(descriptionTextarea.value);
     });
 
     onBeforeUnmount(() => {
-      document.removeEventListener('click', closeDropdownOnClickOutside);
+      document.removeEventListener('click', closeDropdownOnClickOutside, true);
     });
 
     const fetchProjectData = async () => {
@@ -182,8 +197,6 @@ export default {
             projectOwnerEmail.value,
             ...projectCollaborators.value
           ].filter(Boolean);
-          
-          filterAvailableAssignees();
         }
       } catch (error) {
         console.error('Error fetching project data:', error);
@@ -191,10 +204,21 @@ export default {
     };
     
     const closeDropdownOnClickOutside = (event) => {
-      const dropdown = document.querySelector('.assignee-dropdown');
-      if (dropdown && !dropdown.contains(event.target)) {
-        showAssigneeDropdown.value = false;
+      // If the dropdown is not shown, no need to check
+      if (!showAssigneeDropdown.value) return;
+      
+      // Don't close if clicking on the assign button (toggle behavior)
+      if (event.target.closest('.assign-button')) {
+        return;
       }
+      
+      // Don't close if clicking inside the popover
+      if (event.target.closest('.assignee-popover')) {
+        return;
+      }
+      
+      // Close the dropdown for any other clicks
+      showAssigneeDropdown.value = false;
     };
 
     const debouncedSave = debounce(() => {
@@ -210,26 +234,17 @@ export default {
       debouncedSave();
     };
 
-    const filterAvailableAssignees = () => {
-      const searchTerm = assigneeSearch.value.toLowerCase();
-      filteredAvailableAssignees.value = availableAssignees.value
-        .filter(email => !localTask.value.assignees.includes(email))
-        .filter(email => email.toLowerCase().includes(searchTerm));
-    };
-
     const addAssignee = (email) => {
       if (!localTask.value.assignees.includes(email)) {
         localTask.value.assignees.push(email);
-        assigneeSearch.value = '';
-        filterAvailableAssignees();
         debouncedSave();
       }
+      // Close the dropdown after adding an assignee
       showAssigneeDropdown.value = false;
     };
 
     const removeAssignee = (assignee) => {
       localTask.value.assignees = localTask.value.assignees.filter(a => a !== assignee);
-      filterAvailableAssignees();
       debouncedSave();
     };
 
@@ -284,18 +299,19 @@ export default {
       }
     };
 
+    const toggleAssigneeDropdown = () => {
+      showAssigneeDropdown.value = !showAssigneeDropdown.value;
+    };
+
     return {
       localTask,
-      assigneesInput,
       statuses,
       showDeleteConfirmation,
       showAssigneeDropdown,
-      assigneeSearch,
-      filteredAvailableAssignees,
+      availableAssigneesToShow,
       titleTextarea,
       descriptionTextarea,
       handleStatusChange,
-      filterAvailableAssignees,
       addAssignee,
       removeAssignee,
       formatCreatedAt,
@@ -304,7 +320,8 @@ export default {
       onDescriptionInput,
       adjustTextareaHeight,
       openDeleteConfirmation,
-      deleteTask
+      deleteTask,
+      toggleAssigneeDropdown
     };
   }
 };
@@ -449,7 +466,7 @@ label {
 
 /* Description Styling */
 .description-container {
-  margin-bottom: 1.25rem;
+  margin-bottom: 2rem;
 }
 
 .description-input {
@@ -458,7 +475,7 @@ label {
   border: none;
   color: #e6e6e9;
   font-family: 'Poppins', sans-serif;
-  font-size: 1rem;
+  font-size: 0.875rem;
   padding: 0.5rem;
   min-height: 1.5rem;
   resize: none;
@@ -613,10 +630,17 @@ label {
 }
 
 /* Assignee Selector Styles */
-.assignee-selector {
+.assignee-section {
   display: flex;
-  flex-direction: column;
+  align-items: flex-start;
   margin-top: 0.5rem;
+  position: relative;
+  gap: 12px;
+}
+
+.assignee-container {
+  display: flex;
+  flex: 1;
 }
 
 .assignee-chips {
@@ -624,65 +648,93 @@ label {
   flex-wrap: wrap;
   gap: 0.5rem;
   margin-bottom: 0.75rem;
+  flex: 1;
 }
 
-.assignee-chip {
+.no-assignees {
+  flex: 1;
+  line-height:36px;
+  display: flex;
+  align-items: center;
+  color: #6c6c84;
+  font-size: 0.9rem;
+}
+
+.assign-button {
+  height: 36px;
+  padding: 3px 15px;
   background-color: #2d2d3a;
-  border-radius: 12px;
-  padding: 0.25rem 0.75rem;
-  margin-right: 0.5rem;
-  font-size: 0.85rem;
-  color: #e6e6e9;
-}
-
-.remove-assignee {
-  background: none;
-  border: none;
-  color: #ff7e86;
-  font-size: 0.85rem;
-  cursor: pointer;
-  padding: 0;
-}
-
-.assignee-dropdown {
-  position: relative;
-  flex-grow: 1;
-}
-
-.assignee-input {
-  width: 100%;
-  padding: 0.75rem 1rem;
-  border: 1px solid #2d2d3a;
-  border-radius: 8px;
-  background-color: #252535;
-  color: #e6e6e9;
+  color: #a1a1b5;
+  border-radius: 18px;
   font-family: 'Poppins', sans-serif;
-  font-size: 0.95rem;
+  font-weight: 500;
+  font-size: 0.8rem;
+  transition: all 0.2s ease;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 0;
+  flex-shrink: 0;
 }
 
-.dropdown-menu {
+.assign-button:hover {
+  background-color: #3a3a4a;
+  color: #e6e6e9;
+}
+
+.plus-icon {
+  width: 14px;
+  height: 14px;
+  margin-left: 8px;
+}
+
+.assignee-popover {
   position: absolute;
-  top: 100%;
-  left: 0;
-  width: 100%;
-  background-color: #1a1a27;
-  border: 1px solid #2d2d3a;
+  bottom: 100%;
+  left: -12px;
+  width: auto;
+  background-color: rgba(26, 26, 39, 0.25);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   border-radius: 8px;
+  z-index: 10;
+  margin-bottom: 12px;
+  box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.3);
+  padding: 12px;
+  white-space: nowrap;
+}
+
+.assignee-list {
   max-height: 200px;
   overflow-y: auto;
-  z-index: 10;
-  margin-top: 4px;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
-.dropdown-item {
-  padding: 0.5rem 1rem;
+.assignee-list-item {
   cursor: pointer;
-  color: #e6e6e9;
-  font-size: 0.95rem;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  display: inline-block;
 }
 
-.dropdown-item:hover {
-  background-color: rgba(45, 45, 58, 0.3);
+.assignee-list-item:hover .assignee-chip {
+  background-color: rgba(99, 102, 241, 0.5);
+}
+
+.no-results {
+  padding: 0.5rem;
+  text-align: center;
+  color: rgba(230, 230, 233, 0.7);
+  font-size: 0.85rem;
+  white-space: normal;
+  min-width: 180px;
+}
+
+.popover-chip {
+  display: inline-flex;
 }
 </style>

@@ -16,28 +16,25 @@
     </div>
     
     <div v-if="task.assignees && task.assignees.length > 0" class="assignees-container">
-      <div 
+      <assignee-chip
         v-for="email in task.assignees" 
-        :key="email" 
-        class="assignee"
-      >
-        <div 
-          class="assignee-initials" 
-          :style="{ backgroundColor: getInitialsColor(email) }"
-        >
-          {{ getInitials(email) }}
-        </div>
-        <span class="assignee-email">{{ email }}</span>
-      </div>
+        :key="email"
+        :email="email"
+        :removable="false"
+      />
     </div>
   </div>
 </template>
 
 <script>
 import { ref } from 'vue';
+import AssigneeChip from './AssigneeChip.vue';
 
 export default {
   name: 'TaskCard',
+  components: {
+    AssigneeChip
+  },
   props: {
     task: {
       type: Object,
@@ -52,30 +49,6 @@ export default {
       return description.length > 100
         ? description.substring(0, 100) + '...'
         : description;
-    };
-    
-    const getInitials = (email) => {
-      if (!email) return '??';
-      
-      // Extract the part before @ symbol
-      const username = email.split('@')[0];
-      
-      // Get first two characters, uppercase them
-      return username.substring(0, 2).toUpperCase();
-    };
-    
-    const getInitialsColor = (email) => {
-      if (!email) return '#6366f1';
-      
-      // Simple hash function to generate a consistent color from email
-      let hash = 0;
-      for (let i = 0; i < email.length; i++) {
-        hash = email.charCodeAt(i) + ((hash << 5) - hash);
-      }
-      
-      // Generate HSL color with fixed saturation and lightness
-      const h = Math.abs(hash % 360);
-      return `hsl(${h}, 70%, 65%)`;
     };
     
     const onDragStart = (event) => {
@@ -104,8 +77,6 @@ export default {
     return {
       isDragging,
       truncateDescription,
-      getInitials,
-      getInitialsColor,
       onDragStart,
       onDragEnd
     };
@@ -170,57 +141,8 @@ export default {
   margin-top: 0.75rem;
 }
 
-.assignee {
-  display: flex;
-  align-items: center;
-  max-width: 100%;
-}
-
-.assignee-initials {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.7rem;
-  font-weight: 600;
-  color: #fff;
-  margin-right: 0.5rem;
-  flex-shrink: 0;
-}
-
-.assignee-email {
-  font-size: 0.75rem;
-  color: #a1a1b5;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* Status-specific styling */
-.status-backlog {
-  border-left: 3px solid #6c6c84;
-}
-
-.status-ready {
-  border-left: 3px solid #6366f1;
-}
-
-.status-in-progress {
-  border-left: 3px solid #0ea5e9;
-}
-
-.status-review {
-  border-left: 3px solid #f59e0b;
-}
-
-.status-qa {
-  border-left: 3px solid #8b5cf6;
-}
-
+/* Only keep the done status styling */
 .status-done {
-  border-left: 3px solid #10b981;
   opacity: 0.7;
 }
 </style> 
