@@ -64,6 +64,7 @@
                   v-for="email in localTask.assignees"
                   :key="email"
                   :email="email"
+                  :projectId="boardId"
                   :removable="true"
                   @remove="removeAssignee"
                 />
@@ -83,6 +84,7 @@
               >
                 <assignee-chip
                   :email="email"
+                  :projectId="boardId"
                   :removable="false"
                   class="popover-chip"
                 />
@@ -138,9 +140,10 @@ import { ref, onMounted, onBeforeUnmount, watch, nextTick, computed } from 'vue'
 import { Dialog, DialogPanel, DialogTitle } from '@headlessui/vue';
 import { TrashIcon } from '@heroicons/vue/24/outline';
 import { doc, deleteDoc, getDoc } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db, auth } from '../firebase';
 import debounce from 'lodash/debounce';
 import AssigneeChip from './AssigneeChip.vue';
+import userStore from '../userStore';
 
 export default {
   name: 'TaskModal',
@@ -152,6 +155,7 @@ export default {
     AssigneeChip
   },
   props: ['task', 'boardId'],
+  emits: ['close', 'save', 'delete'],
   setup(props, { emit }) {
     const localTask = ref({
       ...props.task,
@@ -169,6 +173,15 @@ export default {
 
     // Computed property to get available assignees that aren't already assigned
     const availableAssigneesToShow = computed(() => {
+      // Make sure we have the current user's email
+      const currentUserEmail = auth.currentUser?.email;
+      
+      // If the current user isn't in the available assignees list, add them
+      if (currentUserEmail && !availableAssignees.value.includes(currentUserEmail)) {
+        availableAssignees.value.push(currentUserEmail);
+      }
+      
+      // Filter out assignees that are already assigned to the task
       return availableAssignees.value.filter(email => 
         !localTask.value.assignees.includes(email)
       );
@@ -193,10 +206,18 @@ export default {
           projectCollaborators.value = projectData.collaborators || [];
           projectOwnerEmail.value = projectData.ownerEmail || '';
           
-          availableAssignees.value = [
+          // Get the current user's email
+          const currentUserEmail = auth.currentUser?.email;
+          
+          // Create a Set to ensure uniqueness
+          const uniqueAssignees = new Set([
             projectOwnerEmail.value,
-            ...projectCollaborators.value
-          ].filter(Boolean);
+            ...projectCollaborators.value,
+            currentUserEmail // Add current user
+          ].filter(Boolean)); // Remove any null/undefined values
+          
+          // Convert back to array
+          availableAssignees.value = Array.from(uniqueAssignees);
         }
       } catch (error) {
         console.error('Error fetching project data:', error);
@@ -432,7 +453,7 @@ label {
 
 /* Title Styling */
 .title-container {
-  margin-bottom: 1.25rem;
+  margin-bottom: 1rem;
 }
 
 .title-input {
@@ -441,15 +462,15 @@ label {
   border: none;
   color: #e6e6e9;
   font-family: 'Poppins', sans-serif;
-  font-size: 1.5rem;
+  font-size: 1.25rem;
   font-weight: 600;
   padding: 0.5rem;
   transition: all 0.2s ease;
   resize: none;
   overflow: hidden;
   display: block;
-  line-height: 1.2;
-  min-height: 2.2rem;
+  line-height: 1.5;
+  min-height: 1.5rem;
   box-sizing: border-box;
 }
 
@@ -457,6 +478,7 @@ label {
   outline: none;
   background-color: rgba(37, 37, 53, 0.5);
   border-radius: 8px;
+  color: #ffffff;
 }
 
 .title-input::placeholder {
@@ -473,7 +495,7 @@ label {
   width: 100%;
   background-color: transparent;
   border: none;
-  color: #e6e6e9;
+  color: #a1a1b5;
   font-family: 'Poppins', sans-serif;
   font-size: 0.875rem;
   padding: 0.5rem;
@@ -490,6 +512,7 @@ label {
   outline: none;
   background-color: rgba(37, 37, 53, 0.5);
   border-radius: 8px;
+  color: #ffffff;
 }
 
 .description-input::placeholder {
@@ -653,7 +676,7 @@ label {
 
 .no-assignees {
   flex: 1;
-  line-height:36px;
+  line-height:30px;
   display: flex;
   align-items: center;
   color: #6c6c84;
@@ -661,11 +684,11 @@ label {
 }
 
 .assign-button {
-  height: 36px;
-  padding: 3px 15px;
+  height: 30px;
+  padding: 3px 10px 3px 15px;
   background-color: #2d2d3a;
   color: #a1a1b5;
-  border-radius: 18px;
+  border-radius: 15px;
   font-family: 'Poppins', sans-serif;
   font-weight: 500;
   font-size: 0.8rem;

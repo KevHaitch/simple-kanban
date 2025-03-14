@@ -3,3 +3,19 @@
 .task-list .task-card {
   background-color: #000;
 }
+
+/* Add these CSS custom properties for assignee colors */
+:root {
+  --assignee-color-1: #FF6B6B; /* Red */
+  --assignee-color-2: #4ECDC4; /* Teal */
+  --assignee-color-3: #FF9F1C; /* Orange */
+  --assignee-color-4: #6A0572; /* Purple */
+  --assignee-color-5: #1A936F; /* Green */
+  --assignee-color-6: #3D5A80; /* Blue */
+  --assignee-color-7: #E76F51; /* Coral */
+  --assignee-color-8: #8338EC; /* Violet */
+  --assignee-color-9: #06D6A0; /* Mint */
+  --assignee-color-10: #118AB2; /* Sky Blue */
+  --assignee-color-11: #7209B7; /* Magenta */
+  --assignee-color-12: #FFD166; /* Yellow */
+}

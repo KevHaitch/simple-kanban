@@ -2,7 +2,8 @@
   <div class="assignee-chip">
     <div 
       class="assignee-initials" 
-      :style="{ backgroundColor: getInitialsColor(email) }"
+      :style="{ backgroundColor: initialsColor }"
+      :data-email="email"
     >
       {{ getInitials(email) }}
     </div>
@@ -18,8 +19,9 @@
 </template>
 
 <script>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import userStore from '../userStore';
+import colorService from '../services/colorService';
 
 export default {
   name: 'AssigneeChip',
@@ -37,6 +39,10 @@ export default {
     // Initialize with the first name from email as fallback
     const displayName = ref(userStore.getFirstNameFromEmail(props.email));
     
+    // Get color directly from colorService - this is not reactive
+    // We use a ref instead of computed to avoid unnecessary reactivity
+    const initialsColor = ref(colorService.getColorForEmail(props.email));
+    
     onMounted(async () => {
       try {
         // Try to get user profile from the store
@@ -52,33 +58,22 @@ export default {
     });
     
     function getInitials(email) {
-      if (!email) return '??';
+      if (!email) return '?';
       
-      // Extract the part before @ symbol
-      const username = email.split('@')[0];
-      
-      // Get first two characters, uppercase them
-      return username.substring(0, 2).toUpperCase();
-    }
-    
-    function getInitialsColor(email) {
-      if (!email) return '#6366f1';
-      
-      // Simple hash function to generate a consistent color from email
-      let hash = 0;
-      for (let i = 0; i < email.length; i++) {
-        hash = email.charCodeAt(i) + ((hash << 5) - hash);
+      // If we have a display name, use the first letter of that
+      if (displayName.value) {
+        return displayName.value.charAt(0).toUpperCase();
       }
       
-      // Generate HSL color with fixed saturation and lightness
-      const h = Math.abs(hash % 360);
-      return `hsl(${h}, 70%, 65%)`;
+      // Fallback to the first letter of the email username
+      const username = email.split('@')[0];
+      return username.charAt(0).toUpperCase();
     }
     
     return {
       displayName,
       getInitials,
-      getInitialsColor
+      initialsColor
     };
   }
 };
@@ -89,8 +84,8 @@ export default {
   display: flex;
   align-items: center;
   background-color: #2d2d3a;
-  height: 36px;
-  border-radius: 18px; /* 50% border radius */
+  height: 30px;
+  border-radius: 15px; /* 50% border radius */
   padding: 3px;
   max-width: 100%;
   overflow: hidden; /* Ensure content doesn't overflow the rounded corners */
@@ -98,13 +93,13 @@ export default {
 }
 
 .assignee-initials {
-  width: 30px;
-  height: 30px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   font-weight: 600;
   color: #fff;
   margin-right: 8px;

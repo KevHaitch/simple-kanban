@@ -22,6 +22,7 @@
           <div class="task-card-wrapper">
             <task-card 
               :task="element" 
+              :boardId="boardId"
               @click="$emit('openTask', element)" 
               class="draggable-task-card"
             />
@@ -41,6 +42,7 @@
 import { computed, toRefs, ref, onMounted } from 'vue';
 import draggable from 'vuedraggable';
 import TaskCard from './TaskCard.vue';
+import { styleGhostElements, resetTaskStyling, addGlobalDragStyles } from '../utils/dragUtils';
 
 export default {
   name: 'DraggableColumn',
@@ -51,6 +53,10 @@ export default {
   props: {
     column: {
       type: Object,
+      required: true
+    },
+    boardId: {
+      type: String,
       required: true
     },
     emptyMessage: {
@@ -66,65 +72,8 @@ export default {
     
     // Add global styles to ensure consistent placeholder appearance
     onMounted(() => {
-      const style = document.createElement('style');
-      style.innerHTML = `
-        .ghost-card, .sortable-ghost {
-          opacity: 1 !important;
-          background-color: transparent !important;
-          border: 2px dashed #6c6c84 !important;
-          border-radius: 6px !important;
-          box-shadow: none !important;
-        }
-        .ghost-card *, .sortable-ghost * {
-          visibility: hidden !important;
-          opacity: 0 !important;
-        }
-      `;
-      document.head.appendChild(style);
+      addGlobalDragStyles();
     });
-    
-    // Apply consistent styling to ghost elements while preserving dimensions
-    const styleGhostElements = () => {
-      setTimeout(() => {
-        // Find all ghost elements and style them consistently
-        const ghostElements = document.querySelectorAll('.ghost-card, .sortable-ghost');
-        
-        ghostElements.forEach(el => {
-          // Get the original element first
-          const originalEl = document.querySelector('.dragging');
-          
-          if (originalEl) {
-            // Get computed styles of the original element
-            const computedStyle = window.getComputedStyle(originalEl);
-            const originalWidth = computedStyle.width;
-            const originalHeight = computedStyle.height;
-            const originalPadding = computedStyle.padding;
-            const originalMargin = computedStyle.margin;
-            
-            // Apply original dimensions to ghost
-            el.style.setProperty('width', originalWidth, 'important');
-            el.style.setProperty('height', originalHeight, 'important');
-            el.style.setProperty('padding', originalPadding, 'important');
-            el.style.setProperty('margin', originalMargin, 'important');
-          }
-          
-          // Apply ghost styling
-          el.style.setProperty('opacity', '1', 'important');
-          el.style.setProperty('background-color', 'transparent', 'important');
-          el.style.setProperty('border', '2px dashed #6c6c84', 'important');
-          el.style.setProperty('border-radius', '6px', 'important');
-          el.style.setProperty('box-shadow', 'none', 'important');
-          el.style.setProperty('transform', 'none', 'important');
-          
-          // Hide all content within the ghost
-          const children = el.querySelectorAll('*');
-          children.forEach(child => {
-            child.style.setProperty('visibility', 'hidden', 'important');
-            child.style.setProperty('opacity', '0', 'important');
-          });
-        });
-      }, 0);
-    };
     
     // Capture original dimensions on drag start
     const onDragStart = (event) => {
@@ -164,27 +113,6 @@ export default {
         }
       }
     });
-    
-    // Reset styling by removing inline styles added during drag
-    const resetTaskStyling = () => {
-      setTimeout(() => {
-        // Reset all task cards to their normal appearance
-        const taskCards = document.querySelectorAll('.task-card, .task-card-wrapper, .draggable-task-card');
-        taskCards.forEach(el => {
-          // Remove inline styles
-          el.removeAttribute('style');
-          
-          // Remove any lingering classes from dragging
-          el.classList.remove('ghost-card', 'sortable-ghost', 'dragging', 'chosen');
-          
-          // Also reset any children
-          const children = el.querySelectorAll('*');
-          children.forEach(child => {
-            child.removeAttribute('style');
-          });
-        });
-      }, 10);
-    };
     
     // Track when an item is being dragged over this column
     const onMove = (event) => {

@@ -41,6 +41,7 @@
             v-for="col in computedColumns" 
             :key="col.id"
             :column="col"
+            :boardId="selectedBoard.id"
             :emptyMessage="getRandomEmptyMessage()"
             @open-task="openTaskModal"
             @task-moved="handleTaskMoved"
