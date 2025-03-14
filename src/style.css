@@ -1,0 +1,5 @@
+@import "tailwindcss";
+
+.task-list .task-card {
+  background-color: #000;
+}
