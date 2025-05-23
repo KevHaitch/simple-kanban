@@ -13,6 +13,22 @@
           </h1>
         </div>
         <div class="header-actions">
+          <div class="search-container">
+            <form @submit.prevent="performSearch" class="search-form">
+              <input
+                v-model="searchQuery"
+                type="text"
+                placeholder="Search tasks..."
+                class="search-input"
+                @keyup.enter="performSearch"
+              />
+              <button type="submit" class="search-btn" :disabled="!searchQuery.trim()">
+                <svg xmlns="http://www.w3.org/2000/svg" class="search-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </button>
+            </form>
+          </div>
           <button v-if="selectedBoard" @click="openNewTaskModal" class="action-btn">
             Add Task
             <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 20 20" fill="currentColor">
@@ -77,6 +93,14 @@
       @open-task="openTaskModal"
     />
     <app-update-notification />
+    <search-modal
+      v-if="showSearchModal"
+      :is-open="showSearchModal"
+      :results="searchResults"
+      :search-query="searchQuery"
+      @close="closeSearchModal"
+      @open-task="openTaskFromSearch"
+    />
   </div>
 </template>
 
@@ -91,6 +115,7 @@ import ChangelogSidesheet from './components/ChangelogSidesheet.vue';
 import LandingPage from './components/LandingPage.vue';
 import DraggableColumn from './components/DraggableColumn.vue';
 import AppUpdateNotification from './components/AppUpdateNotification.vue';
+import SearchModal from './components/SearchModal.vue';
 
 export default {
   name: 'App',
@@ -101,7 +126,8 @@ export default {
     ChangelogSidesheet, 
     LandingPage,
     DraggableColumn,
-    AppUpdateNotification
+    AppUpdateNotification,
+    SearchModal
   },
   data() {
     return {
@@ -113,6 +139,8 @@ export default {
       showProjectModal: false,
       projectToEdit: null,
       showChangelog: false,
+      showSearchModal: false,
+      searchResults: [],
       columnDefs: [
         { id: 'backlog', name: 'Backlog' },
         { id: 'ready', name: 'Ready' },
@@ -129,7 +157,8 @@ export default {
         "Every moment is a fresh beginning",
         "The universe doesn't allow perfection",
         "Don't let the perfect be the enemy of the good"
-      ]
+      ],
+      searchQuery: ''
     };
   },
   computed: {
@@ -504,6 +533,27 @@ export default {
         return task;
       });
     },
+    performSearch() {
+      if (!this.searchQuery.trim() || !this.selectedBoard) return;
+      
+      const query = this.searchQuery.toLowerCase().trim();
+      this.searchResults = this.tasks.filter(task => {
+        const titleMatch = task.title && task.title.toLowerCase().includes(query);
+        const descriptionMatch = task.description && task.description.toLowerCase().includes(query);
+        return titleMatch || descriptionMatch;
+      });
+      
+      this.showSearchModal = true;
+    },
+    closeSearchModal() {
+      this.showSearchModal = false;
+      this.searchQuery = '';
+      this.searchResults = [];
+    },
+    openTaskFromSearch(task) {
+      this.openTaskModal(task);
+      this.closeSearchModal();
+    },
   },
 };
 </script>
@@ -581,6 +631,69 @@ export default {
   gap: 1rem;
   margin-left: auto;
   margin-right: 2rem;
+}
+
+.search-container {
+  display: flex;
+  align-items: center;
+  margin-right: 1rem;
+}
+
+.search-form {
+  display: flex;
+  align-items: center;
+  background-color: #1e1e2d;
+  border: 1px solid #2d2d3a;
+  border-radius: 8px;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.search-form:focus-within {
+  border-color: #564db6;
+  box-shadow: 0 0 0 3px rgba(86, 77, 182, 0.25);
+}
+
+.search-input {
+  padding: 10px 12px;
+  border: none;
+  background: transparent;
+  color: #e6e6e9;
+  font-family: 'Poppins', sans-serif;
+  font-size: 0.95rem;
+  width: 200px;
+  outline: none;
+}
+
+.search-input::placeholder {
+  color: #6b7280;
+}
+
+.search-btn {
+  padding: 10px 12px;
+  background: transparent;
+  color: #9ca3af;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.search-btn:hover:not(:disabled) {
+  background: #252535;
+  color: #e6e6e9;
+}
+
+.search-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.search-icon {
+  width: 18px;
+  height: 18px;
 }
 
 .action-btn {
