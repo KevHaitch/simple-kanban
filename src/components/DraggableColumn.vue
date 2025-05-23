@@ -94,22 +94,19 @@ export default {
     const columnTasks = computed({
       get: () => column.value.tasks,
       set: (value) => {
-        // This will be triggered when the order changes within the same column
-        // Now we'll emit an event to notify the parent component
-        
-        // Only emit if the array length matches (meaning we're reordering, not adding/removing)
+        // Only emit if we're reordering within the same column
         if (value.length === column.value.tasks.length) {
-          // Check if the order has actually changed
-          const hasOrderChanged = value.some((task, index) => 
-            task.id !== column.value.tasks[index]?.id
-          );
+          // Update the local state immediately to prevent jumping back
+          column.value.tasks = [...value];
           
-          if (hasOrderChanged) {
-            emit('tasksReordered', {
-              columnId: column.value.id,
-              tasks: value,
-            });
-          }
+          // Emit the reorder event with the updated tasks
+          emit('tasksReordered', {
+            columnId: column.value.id,
+            tasks: value.map((task, index) => ({
+              ...task,
+              order: index
+            }))
+          });
         }
       }
     });

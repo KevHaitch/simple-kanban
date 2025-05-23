@@ -396,36 +396,39 @@ export default {
       };
     },
     async saveTask(updatedTask) {
+      if (!this.selectedBoard) return;
+      
       if (updatedTask.id) {
         const taskRef = doc(db, `boards/${this.selectedBoard.id}/tasks`, updatedTask.id);
+        const existingTask = this.tasks.find(t => t.id === updatedTask.id);
+        
+        // Create task data object, preserving all fields
         const taskData = {
           title: updatedTask.title,
-          description: updatedTask.description || '',
+          description: updatedTask.description,
           assignees: updatedTask.assignees || [],
           status: updatedTask.status,
+          createdAt: existingTask?.createdAt,
+          order: existingTask?.order || 0,
+          completedAt: updatedTask.status === 'done' ? (updatedTask.completedAt || new Date()) : null
         };
         
         // If status changed, update order to put it at the end of the column
-        const existingTask = this.tasks.find(t => t.id === updatedTask.id);
         if (existingTask && existingTask.status !== updatedTask.status) {
-          // Get all tasks in the target column
           const tasksInTargetColumn = this.tasks.filter(t => t.status === updatedTask.status);
           const highestOrder = tasksInTargetColumn.length > 0 
             ? Math.max(...tasksInTargetColumn.map(t => t.order || 0)) 
             : -1;
           
-          taskData.order = highestOrder + 1; // Place task at the end of the column
-        }
-        
-        // Add or remove completedAt field based on status
-        if (updatedTask.status === 'done') {
-          taskData.completedAt = updatedTask.completedAt || new Date();
-        } else {
-          // Remove completedAt field if task is not in "done" status
-          taskData.completedAt = null;
+          taskData.order = highestOrder + 1;
         }
         
         await updateDoc(taskRef, taskData);
+        
+        // Update local state
+        this.tasks = this.tasks.map(t => 
+          t.id === updatedTask.id ? { ...t, ...taskData } : t
+        );
       } else {
         const newTaskId = await this.addTask(updatedTask);
         this.selectedTask = { ...updatedTask, id: newTaskId };
@@ -446,22 +449,16 @@ export default {
     async handleTaskMoved({ task, newStatus, oldStatus, newIndex }) {
       if (!this.selectedBoard) return;
 
-      // Get all tasks in the target column
       const tasksInTargetColumn = this.tasks.filter(t => t.status === newStatus);
-      
-      // Determine the new order for the task
       let newOrder = 0;
       
       if (newIndex === 0) {
-        // If dropped at the beginning, place it before the first task
         const firstTask = tasksInTargetColumn[0];
         newOrder = firstTask ? (firstTask.order || 0) - 1 : 0;
       } else if (newIndex >= tasksInTargetColumn.length) {
-        // If dropped at the end, place it after the last task
         const lastTask = tasksInTargetColumn[tasksInTargetColumn.length - 1];
         newOrder = lastTask ? (lastTask.order || 0) + 1 : 0;
       } else {
-        // If dropped in the middle, place it between two tasks
         const taskBefore = tasksInTargetColumn[newIndex - 1];
         const taskAfter = tasksInTargetColumn[newIndex];
         const orderBefore = taskBefore ? (taskBefore.order || 0) : 0;
@@ -469,37 +466,43 @@ export default {
         newOrder = orderBefore + (orderAfter - orderBefore) / 2;
       }
 
-      // Update the task status and order in Firestore
       const taskRef = doc(db, `boards/${this.selectedBoard.id}/tasks`, task.id);
       const taskData = {
+        ...task,
         status: newStatus,
-        order: newOrder
+        order: newOrder,
+        completedAt: newStatus === 'done' ? new Date() : null
       };
-
-      // If the task is moved to 'done', set the completedAt date
-      if (newStatus === 'done' && oldStatus !== 'done') {
-        taskData.completedAt = new Date();
-      } else if (oldStatus === 'done' && newStatus !== 'done') {
-        // If moved from 'done' to another status, remove completedAt
-        taskData.completedAt = null;
-      }
       
       await updateDoc(taskRef, taskData);
+      
+      // Update local state
+      this.tasks = this.tasks.map(t => 
+        t.id === task.id ? { ...t, ...taskData } : t
+      );
     },
     async handleTasksReordered({ columnId, tasks }) {
       if (!this.selectedBoard) return;
       
-      // Create a batch to update all tasks at once
       const batch = writeBatch(db);
       
-      // Update each task with its new order
       tasks.forEach((task, index) => {
         const taskRef = doc(db, `boards/${this.selectedBoard.id}/tasks`, task.id);
-        batch.update(taskRef, { order: index });
+        batch.update(taskRef, { 
+          order: index
+        });
       });
       
-      // Commit the batch
       await batch.commit();
+      
+      // Update local state to match the new order
+      this.tasks = this.tasks.map(task => {
+        const updatedTask = tasks.find(t => t.id === task.id);
+        if (updatedTask) {
+          return { ...task, order: updatedTask.order };
+        }
+        return task;
+      });
     },
   },
 };

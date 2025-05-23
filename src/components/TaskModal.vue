@@ -1,5 +1,5 @@
 <template>
-  <Dialog :open="true" @close="$emit('close')" class="relative z-50">
+  <Dialog :open="true" @close="handleClose" class="relative z-50">
     <div class="fixed inset-0 bg-black/50 backdrop-blur-sm" aria-hidden="true" />
     
     <div class="fixed inset-0 flex items-center justify-center p-4">
@@ -170,6 +170,36 @@ export default {
     const projectCollaborators = ref([]);
     const titleTextarea = ref(null);
     const descriptionTextarea = ref(null);
+    const isInitialLoad = ref(true);
+    const lastSavedTask = ref(JSON.stringify({
+      id: localTask.value.id,
+      title: localTask.value.title,
+      description: localTask.value.description,
+      status: localTask.value.status,
+      assignees: [...(localTask.value.assignees || [])],
+    }));
+
+    // Watch for changes to the task prop
+    watch(() => props.task, (newTask) => {
+      if (newTask) {
+        localTask.value = { ...newTask };
+        // Update lastSavedTask to prevent immediate auto-save
+        lastSavedTask.value = JSON.stringify({
+          id: localTask.value.id,
+          title: localTask.value.title,
+          description: localTask.value.description,
+          status: localTask.value.status,
+          assignees: localTask.value.assignees,
+        });
+        isInitialLoad.value = true;
+        
+        // Adjust textarea heights after DOM updates
+        nextTick(() => {
+          if (titleTextarea.value) adjustTextareaHeight(titleTextarea.value);
+          if (descriptionTextarea.value) adjustTextareaHeight(descriptionTextarea.value);
+        });
+      }
+    }, { immediate: true });
 
     // Computed property to get available assignees that aren't already assigned
     const availableAssigneesToShow = computed(() => {
@@ -243,8 +273,24 @@ export default {
     };
 
     const debouncedSave = debounce(() => {
-      emit('save', localTask.value);
-    }, 500);
+      // Skip saving during initial load
+      if (isInitialLoad.value) {
+        isInitialLoad.value = false;
+        return;
+      }
+      
+      // Always emit save event to ensure changes are saved
+      emit('save', { ...localTask.value });
+    }, 1000);
+
+    // Add a method to force save when modal is closing
+    const forceSave = () => {
+      // Cancel any pending debounced saves
+      debouncedSave.cancel();
+      
+      // Always emit save event when forcing save
+      emit('save', { ...localTask.value });
+    };
 
     const handleStatusChange = () => {
       if (localTask.value.status === 'done') {
@@ -252,13 +298,13 @@ export default {
       } else if (localTask.value.completedAt) {
         localTask.value.completedAt = null;
       }
-      debouncedSave();
+      forceSave(); // Use forceSave instead of debouncedSave for status changes
     };
 
     const addAssignee = (email) => {
       if (!localTask.value.assignees.includes(email)) {
         localTask.value.assignees.push(email);
-        debouncedSave();
+        forceSave();
       }
       // Close the dropdown after adding an assignee
       showAssigneeDropdown.value = false;
@@ -266,7 +312,7 @@ export default {
 
     const removeAssignee = (assignee) => {
       localTask.value.assignees = localTask.value.assignees.filter(a => a !== assignee);
-      debouncedSave();
+      forceSave();
     };
 
     const formatCreatedAt = (createdAt) => {
@@ -283,7 +329,7 @@ export default {
         if (localTask.value.status === 'done') {
           localTask.value.completedAt = new Date();
         }
-        debouncedSave();
+        forceSave(); // Use forceSave instead of debouncedSave for status changes
       }
     };
 
@@ -324,11 +370,17 @@ export default {
       showAssigneeDropdown.value = !showAssigneeDropdown.value;
     };
 
+    const handleClose = () => {
+      forceSave();
+      emit('close');
+    };
+
     return {
       localTask,
       statuses,
       showDeleteConfirmation,
       showAssigneeDropdown,
+      availableAssignees,
       availableAssigneesToShow,
       titleTextarea,
       descriptionTextarea,
@@ -342,7 +394,9 @@ export default {
       adjustTextareaHeight,
       openDeleteConfirmation,
       deleteTask,
-      toggleAssigneeDropdown
+      toggleAssigneeDropdown,
+      forceSave,
+      handleClose,
     };
   }
 };
