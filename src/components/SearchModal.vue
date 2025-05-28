@@ -12,7 +12,15 @@
       
       <div class="search-info">
         <p v-if="searchQuery">
-          Found {{ results.length }} result{{ results.length !== 1 ? 's' : '' }} for "{{ searchQuery }}"
+          <span v-if="hasUsernameSearch && hasKeywordSearch">
+            Found {{ results.length }} task{{ results.length !== 1 ? 's' : '' }} assigned to users matching "{{ getUsernameFromQuery }}" with "{{ getKeywordsFromQuery }}"
+          </span>
+          <span v-else-if="hasUsernameSearch">
+            Found {{ results.length }} task{{ results.length !== 1 ? 's' : '' }} assigned to users matching "{{ getUsernameFromQuery }}"
+          </span>
+          <span v-else>
+            Found {{ results.length }} result{{ results.length !== 1 ? 's' : '' }} for "{{ searchQuery }}"
+          </span>
         </p>
       </div>
       
@@ -32,13 +40,35 @@
             @click="openTask(task)"
           >
             <div class="task-info">
-              <h3 class="task-title" v-html="highlightMatch(task.title, searchQuery)"></h3>
-              <p class="task-description" v-if="task.description" v-html="highlightMatch(task.description, searchQuery)"></p>
+              <h3 class="task-title" v-html="highlightMatch(task.title, getKeywordsFromQuery || searchQuery)"></h3>
+              <p class="task-description" v-if="task.description" v-html="highlightMatch(task.description, getKeywordsFromQuery || searchQuery)"></p>
               <div class="task-meta">
                 <span class="task-status" :class="getStatusClass(task.status)">
                   {{ getStatusName(task.status) }}
                 </span>
-                <span v-if="task.assignees && task.assignees.length > 0" class="task-assignees">
+                
+                <!-- Show assignee chips for searches that include username -->
+                <div v-if="hasUsernameSearch && task.assignees && task.assignees.length > 0" class="assignee-chips">
+                  <div 
+                    v-for="(assignee, index) in getDisplayAssignees(task.assignees)" 
+                    :key="assignee.email"
+                    class="assignee-chip"
+                  >
+                    <div 
+                      class="assignee-initials" 
+                      :style="{ backgroundColor: assignee.color }"
+                    >
+                      {{ assignee.initials }}
+                    </div>
+                    <span class="assignee-name">{{ assignee.name }}</span>
+                  </div>
+                  <div v-if="getAdditionalAssigneeCount(task.assignees) > 0" class="additional-assignees">
+                    +{{ getAdditionalAssigneeCount(task.assignees) }}
+                  </div>
+                </div>
+                
+                <!-- Show assignee count for searches without username -->
+                <span v-else-if="task.assignees && task.assignees.length > 0" class="task-assignees">
                   {{ task.assignees.length }} assignee{{ task.assignees.length !== 1 ? 's' : '' }}
                 </span>
               </div>
@@ -56,6 +86,9 @@
 </template>
 
 <script>
+import userStore from '../userStore';
+import colorService from '../services/colorService';
+
 export default {
   name: 'SearchModal',
   props: {
@@ -73,6 +106,22 @@ export default {
     }
   },
   emits: ['close', 'open-task'],
+  computed: {
+    hasUsernameSearch() {
+      return /@\w+/.test(this.searchQuery);
+    },
+    hasKeywordSearch() {
+      const keywords = this.searchQuery.replace(/@\w+/g, '').trim();
+      return keywords.length > 0;
+    },
+    getUsernameFromQuery() {
+      const match = this.searchQuery.match(/@(\w+)/);
+      return match ? match[1] : '';
+    },
+    getKeywordsFromQuery() {
+      return this.searchQuery.replace(/@\w+/g, '').trim();
+    }
+  },
   methods: {
     closeModal() {
       this.$emit('close');
@@ -100,6 +149,42 @@ export default {
     },
     getStatusClass(status) {
       return `status-${status}`;
+    },
+    getDisplayAssignees(assignees) {
+      if (!assignees || assignees.length === 0) return [];
+      
+      // For searches with username, show matching assignees first, then others
+      const searchUsername = this.getUsernameFromQuery.toLowerCase();
+      
+      const matchingAssignees = [];
+      const otherAssignees = [];
+      
+      assignees.forEach(email => {
+        const firstName = userStore.getFirstNameFromEmail(email);
+        const isMatch = searchUsername && firstName.toLowerCase().includes(searchUsername);
+        
+        const assigneeData = {
+          email,
+          name: firstName,
+          initials: firstName.charAt(0).toUpperCase(),
+          color: colorService.getColorForEmail(email)
+        };
+        
+        if (isMatch) {
+          matchingAssignees.push(assigneeData);
+        } else {
+          otherAssignees.push(assigneeData);
+        }
+      });
+      
+      // Show up to 2 assignees total (prioritize matching ones)
+      const displayAssignees = [...matchingAssignees, ...otherAssignees].slice(0, 2);
+      
+      return displayAssignees;
+    },
+    getAdditionalAssigneeCount(assignees) {
+      if (!assignees || assignees.length <= 2) return 0;
+      return assignees.length - 2;
     }
   }
 };
@@ -296,6 +381,58 @@ export default {
 .task-assignees {
   color: #6b7280;
   font-size: 0.75rem;
+}
+
+.assignee-chips {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.assignee-chip {
+  display: flex;
+  align-items: center;
+  background-color: #2d2d3a;
+  height: 24px;
+  border-radius: 12px;
+  padding: 2px;
+  overflow: hidden;
+}
+
+.assignee-initials {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #fff;
+  margin-right: 6px;
+  flex-shrink: 0;
+}
+
+.assignee-name {
+  font-size: 0.7rem;
+  color: #a1a1b5;
+  white-space: nowrap;
+  padding-right: 8px;
+  flex: 1;
+}
+
+.additional-assignees {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #3b3b4a;
+  color: #9ca3af;
+  font-size: 0.7rem;
+  font-weight: 500;
+  height: 24px;
+  min-width: 32px;
+  border-radius: 12px;
+  padding: 0 8px;
 }
 
 .task-actions {

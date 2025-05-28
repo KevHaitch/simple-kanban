@@ -15,14 +15,20 @@
       {{ truncateDescription(task.description) }}
     </div>
     
-    <div v-if="task.assignees && task.assignees.length > 0" class="assignees-container">
-      <assignee-chip
-        v-for="email in task.assignees" 
-        :key="email"
-        :email="email"
-        :projectId="boardId"
-        :removable="false"
-      />
+    <div class="task-footer">
+      <div v-if="task.assignees && task.assignees.length > 0" class="assignees-container">
+        <assignee-chip
+          v-for="email in task.assignees" 
+          :key="email"
+          :email="email"
+          :projectId="boardId"
+          :removable="false"
+        />
+      </div>
+      
+      <div v-if="task.status === 'done' && task.completedAt" class="completed-datetime">
+        {{ formatCompletedDate(task.completedAt) }}
+      </div>
     </div>
   </div>
 </template>
@@ -66,11 +72,31 @@ export default {
         : description;
     };
     
+    const formatCompletedDate = (completedAt) => {
+      if (!completedAt) return '';
+      
+      // Handle Firestore timestamp or regular Date
+      const date = completedAt?.toDate ? completedAt.toDate() : new Date(completedAt);
+      
+      if (!(date instanceof Date) || isNaN(date)) return '';
+      
+      // Format as "MMM DD, YYYY HH:MM"
+      return date.toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      });
+    };
+    
     return {
       isDragging,
       onDragStart,
       onDragEnd,
-      truncateDescription
+      truncateDescription,
+      formatCompletedDate
     };
   }
 };
@@ -87,6 +113,8 @@ export default {
   border: 1px solid #2d2d3a;
   transition: all 0.2s ease;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
 }
 
 .task-card:hover {
@@ -120,13 +148,34 @@ export default {
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
+  flex: 1;
+}
+
+.task-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-top: auto;
+  gap: 8px;
 }
 
 .assignees-container {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin-top: 8px;
+  flex: 1;
+}
+
+.completed-datetime {
+  font-size: 0.7rem;
+  color: #6b7280;
+  font-weight: 400;
+  white-space: nowrap;
+  margin-left: auto;
+  padding: 2px 6px;
+  background-color: rgba(34, 197, 94, 0.1);
+  border-radius: 4px;
+  border: 1px solid rgba(34, 197, 94, 0.2);
 }
 
 /* Status-specific styling */

@@ -18,7 +18,7 @@
               <input
                 v-model="searchQuery"
                 type="text"
-                placeholder="Search tasks..."
+                placeholder="Search tasks, @username, or combine both..."
                 class="search-input"
                 @keyup.enter="performSearch"
               />
@@ -116,6 +116,7 @@ import LandingPage from './components/LandingPage.vue';
 import DraggableColumn from './components/DraggableColumn.vue';
 import AppUpdateNotification from './components/AppUpdateNotification.vue';
 import SearchModal from './components/SearchModal.vue';
+import userStore from './userStore';
 
 export default {
   name: 'App',
@@ -534,13 +535,44 @@ export default {
       });
     },
     performSearch() {
-      if (!this.searchQuery.trim() || !this.selectedBoard) return;
+      if (!this.searchQuery.trim()) {
+        this.searchResults = [];
+        return;
+      }
+
+      const query = this.searchQuery.trim().toLowerCase();
       
-      const query = this.searchQuery.toLowerCase().trim();
+      // Parse the search query to extract username and keywords
+      const usernameMatch = query.match(/@(\w+)/);
+      const username = usernameMatch ? usernameMatch[1] : null;
+      
+      // Remove the @username part to get the remaining keywords
+      const keywords = query.replace(/@\w+/g, '').trim();
+      
       this.searchResults = this.tasks.filter(task => {
-        const titleMatch = task.title && task.title.toLowerCase().includes(query);
-        const descriptionMatch = task.description && task.description.toLowerCase().includes(query);
-        return titleMatch || descriptionMatch;
+        let matchesUsername = true;
+        let matchesKeywords = true;
+        
+        // Check username match if @username is present
+        if (username) {
+          matchesUsername = false;
+          if (task.assignees && task.assignees.length > 0) {
+            matchesUsername = task.assignees.some(email => {
+              const firstName = userStore.getFirstNameFromEmail(email);
+              return firstName.toLowerCase().includes(username);
+            });
+          }
+        }
+        
+        // Check keywords match if keywords are present
+        if (keywords) {
+          const titleMatch = task.title && task.title.toLowerCase().includes(keywords);
+          const descriptionMatch = task.description && task.description.toLowerCase().includes(keywords);
+          matchesKeywords = titleMatch || descriptionMatch;
+        }
+        
+        // Both conditions must be true (if they exist)
+        return matchesUsername && matchesKeywords;
       });
       
       this.showSearchModal = true;
