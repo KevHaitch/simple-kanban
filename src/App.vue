@@ -185,6 +185,17 @@ export default {
       return this.selectedBoard && this.user && this.selectedBoard.owner === this.user.uid;
     }
   },
+  watch: {
+    boards: {
+      handler(newBoards) {
+        // Automatically select the board if there's exactly one project
+        if (newBoards.length === 1 && (!this.selectedBoard || !newBoards.find(b => b.id === this.selectedBoard.id))) {
+          this.selectBoard(newBoards[0]);
+        }
+      },
+      immediate: false
+    }
+  },
   mounted() {
     onAuthStateChanged(auth, (user) => {
       this.user = user;
@@ -303,8 +314,11 @@ export default {
           // Set the boards immediately so owner can see their own projects
           this.boards = ownerBoards;
           
-          // Select the first board by default if no board is currently selected
-          if (this.boards.length > 0 && !this.selectedBoard) {
+          // Automatically select board if user has exactly one project
+          if (this.boards.length === 1) {
+            this.selectBoard(this.boards[0]);
+          } else if (this.boards.length > 1 && !this.selectedBoard) {
+            // Only select first board if no board is currently selected and there are multiple boards
             this.selectBoard(this.boards[0]);
           }
           
@@ -339,6 +353,14 @@ export default {
                     const timeB = b.createdAt ? (typeof b.createdAt.toMillis === 'function' ? b.createdAt.toMillis() : b.createdAt) : 0;
                     return timeB - timeA;
                   });
+                  
+                  // Automatically select board if user has exactly one project (including collaborator boards)
+                  if (this.boards.length === 1) {
+                    this.selectBoard(this.boards[0]);
+                  } else if (this.boards.length > 1 && !this.selectedBoard) {
+                    // Only select first board if no board is currently selected and there are multiple boards
+                    this.selectBoard(this.boards[0]);
+                  }
                 },
                 (error) => {
                   console.log("Note: Collaborator boards could not be loaded. This is expected if you haven't shared any boards yet.");

@@ -3,7 +3,7 @@
     <Menu as="div" class="relative inline-block text-left">
       <div>
         <MenuButton class="user-btn">
-          {{ user.displayName || 'User' }}
+          {{ user.displayName || "User" }}
         </MenuButton>
       </div>
 
@@ -17,63 +17,85 @@
       >
         <MenuItems class="dropdown-menu">
           <div v-if="boards.length">
-            <MenuItem v-for="board in boards" :key="board.id" v-slot="{ active }">
-              <a 
-                @click="selectBoard(board)" 
-                :class="[
-                  active ? 'menu-item-active' : '',
-                  'dropdown-item'
-                ]"
+            <MenuItem
+              v-for="board in boards"
+              :key="board.id"
+              v-slot="{ active }"
+            >
+              <a
+                @click="selectBoard(board)"
+                :class="[active ? 'menu-item-active' : '', 'dropdown-item']"
               >
                 <div class="board-name-container">
                   {{ board.name }}
-                  <span v-if="!board.isOwner" class="collaborator-badge">Shared</span>
+                  <span v-if="!board.isOwner" class="collaborator-badge"
+                    >Shared</span
+                  >
                 </div>
-                <svg v-if="selectedBoardId === board.id" xmlns="http://www.w3.org/2000/svg" class="check-icon" viewBox="0 0 20 20" fill="currentColor">
-                  <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                <svg
+                  v-if="selectedBoardId === board.id"
+                  xmlns="http://www.w3.org/2000/svg"
+                  class="check-icon"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path
+                    fill-rule="evenodd"
+                    d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                    clip-rule="evenodd"
+                  />
                 </svg>
               </a>
             </MenuItem>
           </div>
           <div v-else>
             <MenuItem v-slot="{ active }">
-              <span 
-                :class="[
-                  active ? 'menu-item-active' : '',
-                  'dropdown-item'
-                ]"
+              <span
+                :class="[active ? 'menu-item-active' : '', 'dropdown-item']"
               >
                 No projects yet
               </span>
             </MenuItem>
           </div>
-          
+
           <div class="dropdown-divider"></div>
-          
+
           <MenuItem v-slot="{ active }">
-            <a 
+            <a
               @click="$emit('new-project')"
-              :class="[
-                active ? 'menu-item-active' : '',
-                'dropdown-item'
-              ]"
+              :class="[active ? 'menu-item-active' : '', 'dropdown-item']"
             >
               New Project
-              <svg xmlns="http://www.w3.org/2000/svg" class="menu-icon" viewBox="0 0 20 20" fill="currentColor">
-                <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" />
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                class="menu-icon"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path
+                  fill-rule="evenodd"
+                  d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
+                  clip-rule="evenodd"
+                />
               </svg>
             </a>
           </MenuItem>
           <MenuItem v-slot="{ active }">
-            <a 
+            <a
               @click="$emit('sign-out')"
-              :class="[
-                active ? 'menu-item-active' : '',
-                'dropdown-item'
-              ]"
+              :class="[active ? 'menu-item-active' : '', 'dropdown-item']"
             >
               Sign Out
-              <svg xmlns="http://www.w3.org/2000/svg" class="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                class="menu-icon"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
                 <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
                 <polyline points="16 17 21 12 16 7"></polyline>
                 <line x1="21" y1="12" x2="9" y2="12"></line>
@@ -87,10 +109,10 @@
 </template>
 
 <script>
-import { Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/vue'
+import { Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/vue";
 
 export default {
-  name: 'UserDropdown',
+  name: "UserDropdown",
   components: {
     Menu,
     MenuButton,
@@ -104,19 +126,19 @@ export default {
   },
   methods: {
     selectBoard(board) {
-      this.$emit('select-board', board);
+      this.$emit("select-board", board);
     },
   },
 };
 </script>
 
 <style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap");
 
 .user-dropdown {
   position: relative;
   display: inline-block;
-  font-family: 'Poppins', sans-serif;
+  font-family: "Poppins", sans-serif;
 }
 
 .user-btn {
@@ -126,7 +148,7 @@ export default {
   border: 1px solid #2d2d3a;
   border-radius: 8px;
   cursor: pointer;
-  font-family: 'Poppins', sans-serif;
+  font-family: "Poppins", sans-serif;
   font-weight: 500;
   transition: all 0.2s ease;
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
@@ -165,7 +187,7 @@ export default {
   text-decoration: none;
   color: #e6e6e9;
   cursor: pointer;
-  font-family: 'Poppins', sans-serif;
+  font-family: "Poppins", sans-serif;
   font-weight: 400;
   font-size: 0.95rem;
   transition: all 0.15s ease;
