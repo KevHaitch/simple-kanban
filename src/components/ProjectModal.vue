@@ -66,6 +66,7 @@ export default {
       default: null
     }
   },
+  emits: ['close', 'create', 'update'],
   data() {
     return {
       projectName: this.project ? this.project.name : '',

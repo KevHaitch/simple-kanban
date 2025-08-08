@@ -9,21 +9,24 @@ service cloud.firestore {
     
     // Allow authenticated users to read and write their own data
     match /boards/{boardId} {
-      // Allow if user is the owner
+      // Allow authenticated users to create new boards where they are the owner
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.owner;
+      
+      // Allow if user is the owner (for existing boards)
       allow read, write: if request.auth != null && request.auth.uid == resource.data.owner;
       
-      // Allow read access if user's email is in the collaborators array
-      allow read: if request.auth != null && request.auth.token.email in resource.data.collaborators;
+      // Allow read access if user's email (lowercase) is in the collaborators array (stored in lowercase)
+      allow read: if request.auth != null && request.auth.token.email.lower() in resource.data.collaborators;
       
       // Tasks within a board
       match /tasks/{taskId} {
         // Allow if user is the owner of the parent board
         allow read, write: if request.auth != null && get(/databases/$(database)/documents/boards/$(boardId)).data.owner == request.auth.uid;
         
-        // Allow collaborators full read/write access to tasks
+        // Allow collaborators full read/write access to tasks (lowercase email matching)
         // This allows them to edit title, description, status, assignees, etc.
         allow read, write: if request.auth != null && 
-                          request.auth.token.email in get(/databases/$(database)/documents/boards/$(boardId)).data.collaborators;
+                          request.auth.token.email.lower() in get(/databases/$(database)/documents/boards/$(boardId)).data.collaborators;
       }
     }
   }

@@ -230,30 +230,60 @@ export default {
     async createProject(projectData) {
       if (!projectData.name || !this.user) return;
       
-      // Filter out empty emails and make sure emails are unique
+      // Filter out empty emails and make sure emails are unique (case-insensitive)
       const collaborators = projectData.collaborators
         ? projectData.collaborators
             .filter(email => email && email.includes('@'))
-            .filter((email, index, self) => self.indexOf(email) === index)
+            .map(email => email.trim().toLowerCase()) // Store in lowercase
+            .filter((email, index, self) => {
+              // Case-insensitive uniqueness check
+              return self.findIndex(e => e === email) === index;
+            })
         : [];
         
-      await addDoc(collection(db, 'boards'), {
-        name: projectData.name,
-        owner: this.user.uid,
-        ownerEmail: this.user.email,
-        collaborators: collaborators,
-        createdAt: new Date(),
-      });
-      this.closeProjectModal();
+      try {
+        const docRef = await addDoc(collection(db, 'boards'), {
+          name: projectData.name,
+          owner: this.user.uid,
+          ownerEmail: this.user.email, // Keep original case
+          collaborators: collaborators,
+          createdAt: new Date(),
+        });
+        
+        // Create the new board object that matches what we expect
+        const newBoard = {
+          id: docRef.id,
+          name: projectData.name,
+          owner: this.user.uid,
+          ownerEmail: this.user.email,
+          collaborators: collaborators,
+          createdAt: new Date(),
+          isOwner: true
+        };
+        
+        // Add the new board to the beginning of the boards list for immediate feedback
+        this.boards.unshift(newBoard);
+        
+        // Automatically select the newly created project
+        this.selectBoard(newBoard);
+        
+        this.closeProjectModal();
+      } catch (error) {
+        console.error('Error creating project:', error);
+      }
     },
     async updateProject(updatedProject) {
       if (!updatedProject.id || !this.user) return;
       
-      // Filter out empty emails and make sure emails are unique
+      // Filter out empty emails and make sure emails are unique (case-insensitive)
       const collaborators = updatedProject.collaborators
         ? updatedProject.collaborators
             .filter(email => email && email.includes('@'))
-            .filter((email, index, self) => self.indexOf(email) === index)
+            .map(email => email.trim().toLowerCase()) // Store in lowercase
+            .filter((email, index, self) => {
+              // Case-insensitive uniqueness check
+              return self.findIndex(e => e === email) === index;
+            })
         : [];
       
       const projectRef = doc(db, 'boards', updatedProject.id);
@@ -303,34 +333,43 @@ export default {
           // Set the boards immediately so owner can see their own projects
           this.boards = ownerBoards;
           
-          // Select the first board by default if no board is currently selected
-          if (this.boards.length > 0 && !this.selectedBoard) {
-            this.selectBoard(this.boards[0]);
-          }
+          // Select the appropriate board (last used or first available)
+          this.selectAppropriateBoard();
           
           // Create a query for boards where user is a collaborator
           if (this.user.email) {
             try {
+              const userEmailLower = this.user.email.toLowerCase();
+              console.log('User email (lowercase):', userEmailLower);
+              
+              // Query boards where user's email is in the collaborators array
               const collaboratorQuery = query(
                 collection(db, 'boards'), 
-                where('collaborators', 'array-contains', this.user.email)
+                where('collaborators', 'array-contains', userEmailLower)
               );
               
               // Fetch boards where user is a collaborator
               onSnapshot(
                 collaboratorQuery,
-                (collabSnapshot) => {
-                  // Only add boards that aren't already in the list (not owned by user)
-                  const collabBoards = collabSnapshot.docs
-                    .filter(doc => !ownerBoards.some(board => board.id === doc.id))
+                (collaboratorSnapshot) => {
+                  // Map the collaborator boards and add isOwner flag
+                  const collabBoards = collaboratorSnapshot.docs
+                    .filter(doc => {
+                      // Skip if this is a board owned by the user (already in ownerBoards)
+                      return !ownerBoards.some(board => board.id === doc.id);
+                    })
                     .map((doc) => {
                       const data = doc.data();
+                      console.log(`Found collaborative board: "${data.name}"`);
                       return { 
                         id: doc.id, 
                         ...data,
                         isOwner: false 
                       };
                     });
+                  
+                  console.log('Found collaborative boards:', collabBoards.length);
+                  console.log('Collaborative boards:', collabBoards.map(b => b.name));
                   
                   // Add collaborator boards to the list
                   this.boards = [...ownerBoards, ...collabBoards].sort((a, b) => {
@@ -339,17 +378,20 @@ export default {
                     const timeB = b.createdAt ? (typeof b.createdAt.toMillis === 'function' ? b.createdAt.toMillis() : b.createdAt) : 0;
                     return timeB - timeA;
                   });
+                  
+                  // Select the appropriate board after all boards are loaded
+                  this.selectAppropriateBoard();
                 },
                 (error) => {
-                  console.log("Note: Collaborator boards could not be loaded. This is expected if you haven't shared any boards yet.");
-                  // Don't show error in console as it's expected until rules are properly deployed
-                  // console.error("Error fetching collaborator boards:", error);
+                  console.error("Error fetching collaborator boards:", error);
+                  // Still keep owner boards even if collaborator query fails
+                  this.selectAppropriateBoard();
                 }
               );
             } catch (error) {
-              console.log("Note: Collaborator boards could not be loaded. This is expected if you haven't shared any boards yet.");
-              // Don't show error in console as it's expected until rules are properly deployed
-              // console.error("Error setting up collaborator query:", error);
+              console.error("Error setting up collaborator query:", error);
+              // Still keep owner boards even if collaborator query fails
+              this.selectAppropriateBoard();
             }
           }
         },
@@ -362,6 +404,40 @@ export default {
     selectBoard(board) {
       this.selectedBoard = board;
       this.loadTasks(board.id);
+      
+      // Save the last used board ID to localStorage
+      try {
+        localStorage.setItem('lastUsedBoardId', board.id);
+      } catch (error) {
+        console.error('Error saving last used board:', error);
+      }
+    },
+    selectAppropriateBoard() {
+      if (this.boards.length === 0 || this.selectedBoard) return;
+      
+      // Try to get the last used board ID from localStorage
+      let lastUsedBoardId = null;
+      try {
+        lastUsedBoardId = localStorage.getItem('lastUsedBoardId');
+      } catch (error) {
+        console.error('Error reading last used board:', error);
+      }
+      
+      // Find the last used board if it exists in the available boards
+      let boardToSelect = null;
+      if (lastUsedBoardId) {
+        boardToSelect = this.boards.find(board => board.id === lastUsedBoardId);
+      }
+      
+      // If last used board not found, select the first board
+      if (!boardToSelect && this.boards.length > 0) {
+        boardToSelect = this.boards[0];
+      }
+      
+      // Select the board
+      if (boardToSelect) {
+        this.selectBoard(boardToSelect);
+      }
     },
     async addTask(taskData) {
       if (!this.selectedBoard) return;
