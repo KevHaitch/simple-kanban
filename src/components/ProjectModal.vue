@@ -20,16 +20,21 @@
           />
         </div>
         
-        <div class="input-container">
-          <label class="field-label">Collaborators (Optional)</label>
-          <textarea
-            v-model="collaboratorsInput"
-            placeholder="Enter email addresses, separated by commas"
-            class="form-input collaborators-input"
-            rows="2"
-          ></textarea>
-          <div class="help-text">
-            Add comma-separated email addresses of people who can view this project.
+        <div class="two-column-layout">
+          <div class="left-column">
+            <div class="input-container">
+              <collaborator-manager
+                v-model="collaborators"
+              />
+            </div>
+          </div>
+          
+          <div class="right-column">
+            <div class="input-container">
+              <category-manager
+                v-model="categories"
+              />
+            </div>
           </div>
         </div>
         
@@ -48,13 +53,17 @@
   
 <script>
 import { Dialog, DialogPanel, DialogTitle } from '@headlessui/vue';
+import CategoryManager from './CategoryManager.vue';
+import CollaboratorManager from './CollaboratorManager.vue';
 
 export default {
   name: 'ProjectModal',
   components: {
     Dialog,
     DialogPanel,
-    DialogTitle
+    DialogTitle,
+    CategoryManager,
+    CollaboratorManager
   },
   props: {
     isOpen: {
@@ -70,13 +79,39 @@ export default {
   data() {
     return {
       projectName: this.project ? this.project.name : '',
-      collaboratorsInput: this.project && this.project.collaborators ? this.project.collaborators.join(', ') : '',
+      collaborators: [],
+      categories: this.project && this.project.categories ? this.project.categories : [
+        { id: 'general', name: 'General', color: '#3b82f6' },
+        { id: 'bug', name: 'Bug', color: '#ef4444' },
+        { id: 'feature', name: 'Feature', color: '#10b981' },
+        { id: 'documentation', name: 'Documentation', color: '#f59e0b' },
+        { id: 'research', name: 'Research', color: '#8b5cf6' }
+      ],
     };
+  },
+  mounted() {
+    // Initialize collaborators after component is mounted
+    if (this.project) {
+      // Use collaboratorDetails first, fall back to collaborators for backwards compatibility
+      const collaboratorData = this.project.collaboratorDetails || this.project.collaborators;
+      if (collaboratorData) {
+        this.collaborators = this.convertCollaborators(collaboratorData);
+      }
+    }
   },
   watch: {
     project(newProject) {
       this.projectName = newProject ? newProject.name : '';
-      this.collaboratorsInput = newProject && newProject.collaborators ? newProject.collaborators.join(', ') : '';
+      // Use collaboratorDetails first, fall back to collaborators for backwards compatibility
+      const collaboratorData = newProject && (newProject.collaboratorDetails || newProject.collaborators);
+      this.collaborators = collaboratorData ? this.convertCollaborators(collaboratorData) : [];
+      this.categories = newProject && newProject.categories ? newProject.categories : [
+        { id: 'general', name: 'General', color: '#3b82f6' },
+        { id: 'bug', name: 'Bug', color: '#ef4444' },
+        { id: 'feature', name: 'Feature', color: '#10b981' },
+        { id: 'documentation', name: 'Documentation', color: '#f59e0b' },
+        { id: 'research', name: 'Research', color: '#8b5cf6' }
+      ];
     },
     isOpen(newValue) {
       if (newValue) {
@@ -87,30 +122,57 @@ export default {
     }
   },
   methods: {
+    convertCollaborators(collabs) {
+      if (!collabs || collabs.length === 0) return [];
+      
+      return collabs.map((collab, index) => {
+        if (typeof collab === 'object' && collab.id) {
+          return collab; // Already in new format
+        }
+        
+        // Convert from old string format
+        const email = typeof collab === 'string' ? collab : collab.email || '';
+        return {
+          id: email.replace(/[^a-z0-9]/gi, '-').toLowerCase() || `collaborator-${index}`,
+          email: email,
+          color: ['#06b6d4', '#84cc16', '#f97316', '#ec4899', '#8b5cf6'][index % 5]
+        };
+      });
+    },
     saveProject() {
       if (!this.projectName.trim()) return;
-      
-      const collaboratorsArray = this.collaboratorsInput && this.collaboratorsInput.trim() 
-        ? this.collaboratorsInput.split(',').map(email => email.trim()).filter(email => email)
-        : [];
         
       if (this.project) {
         // Update existing project
         this.$emit('update', {
           ...this.project,
           name: this.projectName.trim(),
-          collaborators: collaboratorsArray
+          collaborators: this.collaborators,
+          categories: this.categories
         });
+        // Close modal after updating
+        this.$emit('close');
       } else {
         // Create new project
         this.$emit('create', {
           name: this.projectName.trim(),
-          collaborators: collaboratorsArray
+          collaborators: this.collaborators,
+          categories: this.categories
         });
+        
+        // Only clear fields when creating a new project
+        this.projectName = '';
+        this.collaborators = [];
+        this.categories = [
+          { id: 'general', name: 'General', color: '#3b82f6' },
+          { id: 'bug', name: 'Bug', color: '#ef4444' },
+          { id: 'feature', name: 'Feature', color: '#10b981' },
+          { id: 'documentation', name: 'Documentation', color: '#f59e0b' },
+          { id: 'research', name: 'Research', color: '#8b5cf6' }
+        ];
+        // Close modal after creating
+        this.$emit('close');
       }
-      
-      this.projectName = '';
-      this.collaboratorsInput = '';
     }
   }
 };
@@ -120,7 +182,7 @@ export default {
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap');
 
 .modal-content {
-  max-width: 450px;
+  max-width: 700px;
   width: 100%;
   background-color: #1a1a27;
   padding: 1.75rem;
@@ -140,6 +202,47 @@ export default {
 
 .input-container {
   margin-bottom: 1.5rem;
+}
+
+.two-column-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  margin-bottom: 1.5rem;
+}
+
+.left-column,
+.right-column {
+  display: flex;
+  flex-direction: column;
+}
+
+.right-column {
+  padding-left: 1.5rem;
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.left-column .input-container,
+.right-column .input-container {
+  margin-bottom: 0;
+}
+
+@media (max-width: 768px) {
+  .modal-content {
+    max-width: 450px;
+  }
+  
+  .two-column-layout {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  
+  .right-column {
+    padding-left: 0;
+    padding-top: 1rem;
+    border-left: none;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+  }
 }
 
 .field-label {

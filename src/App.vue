@@ -29,7 +29,7 @@
               </button>
             </form>
           </div>
-          <button v-if="selectedBoard" @click="openNewTaskModal" class="action-btn">
+          <button v-if="selectedBoard" @click="handleNewTask" class="action-btn">
             Add Task
             <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 20 20" fill="currentColor">
               <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" />
@@ -46,8 +46,10 @@
           :user="user"
           :boards="boards"
           :selectedBoardId="selectedBoard?.id"
+          :selectedBoard="selectedBoard"
           @select-board="selectBoard"
           @new-project="openNewProjectModal"
+          @edit-project="openProjectModal"
           @sign-out="signOut"
         />
       </div>
@@ -59,6 +61,8 @@
             :column="col"
             :boardId="selectedBoard.id"
             :emptyMessage="getRandomEmptyMessage()"
+            :board-collaborators="(() => { console.log('Board collaboratorDetails:', selectedBoard.collaboratorDetails); return selectedBoard.collaboratorDetails || []; })()"
+            :board-categories="(() => { console.log('Board categories:', selectedBoard.categories); return selectedBoard.categories || []; })()"
             @open-task="openTaskModal"
             @task-moved="handleTaskMoved"
             @tasks-reordered="handleTasksReordered"
@@ -168,6 +172,13 @@ export default {
       doneTasks: tasks.doneTasks,
       openTaskModal: tasks.openTaskModal,
       openNewTaskModal: tasks.openNewTaskModal,
+      handleNewTask: async () => {
+        try {
+          await tasks.openNewTaskModal();
+        } catch (error) {
+          console.error('Error creating new task:', error);
+        }
+      },
       closeTaskModal: tasks.closeTaskModal,
       saveTask: tasks.saveTask,
       deleteTask: tasks.deleteTask,

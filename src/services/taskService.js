@@ -32,11 +32,12 @@ export async function createTask(boardId, taskData, existingTasks = []) {
     : -1;
   
   const newTask = {
-    title: taskData.title || 'New Task',
+    title: taskData.title || '', // Allow empty titles
     description: taskData.description || '',
     assignees: taskData.assignees || [],
     status: taskData.status || 'backlog',
-    createdAt: new Date(),
+    category: taskData.category || 'General',
+    createdAt: taskData.createdAt || new Date(),
     order: highestOrder + 1,
   };
   

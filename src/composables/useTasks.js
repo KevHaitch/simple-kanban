@@ -90,22 +90,31 @@ export function useTasks(selectedBoard) {
    * Save/update a task
    */
   async function saveTask(task) {
-    if (!selectedBoard.value || !task.id) {
-      throw new Error('Board and task ID are required');
+    if (!selectedBoard.value) {
+      throw new Error('No board selected');
+    }
+
+    if (!task.id) {
+      throw new Error('Task ID is required - all tasks should be created before editing');
     }
 
     try {
       error.value = null;
       
-      // Prepare update data, preserving all fields
+      // Update existing task
       const updates = {
         title: task.title,
         description: task.description,
         assignees: task.assignees || [],
         status: task.status,
-        order: task.order,
+        category: task.category || 'General',
         createdAt: task.createdAt
       };
+
+      // Only include order if it exists and is not undefined
+      if (task.order !== undefined) {
+        updates.order = task.order;
+      }
 
       // Include completedAt if it exists
       if (task.completedAt) {
@@ -114,11 +123,8 @@ export function useTasks(selectedBoard) {
 
       await updateTask(selectedBoard.value.id, task.id, updates);
       
-      // Update local state
-      const taskIndex = tasks.value.findIndex(t => t.id === task.id);
-      if (taskIndex !== -1) {
-        tasks.value[taskIndex] = { ...task, ...updates };
-      }
+      // Note: Local state will be updated automatically by the real-time listener
+      return task.id;
     } catch (err) {
       error.value = err.message;
       console.error('Error saving task:', err);
@@ -175,11 +181,7 @@ export function useTasks(selectedBoard) {
 
       await moveTask(selectedBoard.value.id, task.id, newStatus, newOrder);
       
-      // Update local state
-      const taskIndex = tasks.value.findIndex(t => t.id === task.id);
-      if (taskIndex !== -1) {
-        tasks.value[taskIndex] = updatedTask;
-      }
+      // Note: Local state will be updated automatically by the real-time listener
     } catch (err) {
       error.value = err.message;
       console.error('Error moving task:', err);
@@ -204,13 +206,7 @@ export function useTasks(selectedBoard) {
 
       await reorderTasks(selectedBoard.value.id, tasksWithOrder);
       
-      // Update local state - only update order for tasks in this column
-      tasksWithOrder.forEach(updatedTask => {
-        const taskIndex = tasks.value.findIndex(t => t.id === updatedTask.id);
-        if (taskIndex !== -1) {
-          tasks.value[taskIndex].order = updatedTask.order;
-        }
-      });
+      // Note: Local state will be updated automatically by the real-time listener
     } catch (err) {
       error.value = err.message;
       console.error('Error reordering tasks:', err);
@@ -231,14 +227,61 @@ export function useTasks(selectedBoard) {
   /**
    * Open new task modal
    */
-  function openNewTaskModal() {
-    selectedTask.value = {
-      title: '',
-      description: '',
-      assignees: [],
-      status: 'backlog',
-      createdAt: new Date(),
-    };
+  async function openNewTaskModal() {
+    if (!selectedBoard.value) {
+      throw new Error('No board selected');
+    }
+
+    try {
+      error.value = null;
+      
+      // Create the task immediately with minimal data - no title so user must fill it in
+      const newTaskData = {
+        title: '', // Empty title - user must provide
+        description: '',
+        assignees: [], // Empty assignees - user can add later
+        status: 'backlog', // Always starts in backlog
+        category: 'General', // Default category
+        createdAt: new Date(),
+      };
+      
+      const taskId = await createTask(selectedBoard.value.id, newTaskData, tasks.value);
+      
+      // Create the full task object with ID
+      const newTask = {
+        ...newTaskData,
+        id: taskId
+      };
+      
+      // Wait for the real-time listener to update the tasks array with the new task
+      // This ensures the task exists in the UI before we try to edit it
+      let attempts = 0;
+      const maxAttempts = 20; // 2 seconds max wait
+      
+      while (attempts < maxAttempts) {
+        const taskExists = tasks.value.find(t => t.id === taskId);
+        if (taskExists) {
+          // Task is now in the UI, safe to open modal
+          openTaskModal(newTask);
+          break;
+        }
+        // Wait 100ms and try again
+        await new Promise(resolve => setTimeout(resolve, 100));
+        attempts++;
+      }
+      
+      if (attempts >= maxAttempts) {
+        // Fallback: open modal anyway after timeout
+        console.warn('Task creation timed out, opening modal anyway');
+        openTaskModal(newTask);
+      }
+      
+      return taskId;
+    } catch (err) {
+      error.value = err.message;
+      console.error('Error creating new task:', err);
+      throw err;
+    }
   }
 
   /**

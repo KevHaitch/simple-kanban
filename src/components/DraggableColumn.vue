@@ -23,6 +23,8 @@
             <task-card 
               :task="element" 
               :boardId="boardId"
+              :board-collaborators="boardCollaborators"
+              :board-categories="boardCategories"
               @click="$emit('openTask', element)" 
               class="draggable-task-card"
             />
@@ -62,6 +64,14 @@ export default {
     emptyMessage: {
       type: String,
       default: 'No tasks yet'
+    },
+    boardCollaborators: {
+      type: Array,
+      default: () => []
+    },
+    boardCategories: {
+      type: Array,
+      default: () => []
     }
   },
   emits: ['openTask', 'taskMoved', 'tasksReordered'],
@@ -102,7 +112,7 @@ export default {
           // Emit the reorder event with the updated tasks
           emit('tasksReordered', {
             columnId: column.value.id,
-            tasks: value.map((task, index) => ({
+            reorderedTasks: value.map((task, index) => ({
               ...task,
               order: index
             }))
@@ -160,7 +170,7 @@ export default {
           task,
           newStatus,
           oldStatus: task.status,
-          newIndex
+          newOrder: newIndex
         });
       }
       

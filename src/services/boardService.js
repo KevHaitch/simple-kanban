@@ -25,12 +25,30 @@ export async function createBoard(boardData, userId, userEmail) {
     throw new Error('Board name and user ID are required');
   }
   
-  // Filter and normalize collaborator emails
+  // Extract emails for collaborators array (maintain query compatibility)
   const collaborators = boardData.collaborators
     ? boardData.collaborators
+        .map(collab => typeof collab === 'object' ? collab.email : collab) // Extract email from object
         .filter(email => email && email.includes('@'))
         .map(email => email.trim().toLowerCase())
         .filter((email, index, self) => self.indexOf(email) === index)
+    : [];
+    
+  // Create collaborator details for storing colors and IDs
+  const collaboratorDetails = boardData.collaborators
+    ? boardData.collaborators
+        .map(collab => {
+          if (typeof collab === 'object' && collab.email) {
+            return {
+              id: collab.id,
+              email: collab.email.trim().toLowerCase(),
+              color: collab.color
+            };
+          }
+          return null;
+        })
+        .filter(collab => collab && collab.email && collab.email.includes('@'))
+        .filter((collab, index, self) => self.findIndex(c => c.email === collab.email) === index)
     : [];
     
   const docRef = await addDoc(collection(db, 'boards'), {
@@ -38,6 +56,14 @@ export async function createBoard(boardData, userId, userEmail) {
     owner: userId,
     ownerEmail: userEmail,
     collaborators: collaborators,
+    collaboratorDetails: collaboratorDetails,
+    categories: boardData.categories || [
+      { id: 'general', name: 'General', color: '#3b82f6' },
+      { id: 'bug', name: 'Bug', color: '#ef4444' },
+      { id: 'feature', name: 'Feature', color: '#10b981' },
+      { id: 'documentation', name: 'Documentation', color: '#f59e0b' },
+      { id: 'research', name: 'Research', color: '#8b5cf6' }
+    ],
     createdAt: new Date(),
   });
   
@@ -56,12 +82,40 @@ export async function updateBoard(boardId, updateData) {
   
   const updates = { ...updateData };
   
-  // Normalize collaborators if provided
+  // Process collaborators if provided
   if (updates.collaborators) {
+    // Extract emails for collaborators array (maintain query compatibility)
     updates.collaborators = updates.collaborators
+      .map(collab => typeof collab === 'object' ? collab.email : collab) // Extract email from object
       .filter(email => email && email.includes('@'))
       .map(email => email.trim().toLowerCase())
       .filter((email, index, self) => self.indexOf(email) === index);
+      
+    // Create collaborator details for storing colors and IDs
+    updates.collaboratorDetails = updateData.collaborators
+      ? updateData.collaborators
+          .map(collab => {
+            if (typeof collab === 'object' && collab.email) {
+              return {
+                id: collab.id,
+                email: collab.email.trim().toLowerCase(),
+                color: collab.color
+              };
+            }
+            return null;
+          })
+          .filter(collab => collab && collab.email && collab.email.includes('@'))
+          .filter((collab, index, self) => self.findIndex(c => c.email === collab.email) === index)
+      : [];
+  }
+  
+  // Process categories if provided
+  if (updates.categories) {
+    // Categories are now objects with id, name, and color
+    // Ensure each category has required fields and remove duplicates by ID
+    updates.categories = updates.categories
+      .filter(cat => cat && cat.id && cat.name)
+      .filter((cat, index, self) => self.findIndex(c => c.id === cat.id) === index);
   }
   
   const boardRef = doc(db, 'boards', boardId);

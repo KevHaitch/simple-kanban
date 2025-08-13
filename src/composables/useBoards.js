@@ -187,7 +187,8 @@ export function useBoards(user) {
       error.value = null;
       await updateBoard(updatedProject.id, {
         name: updatedProject.name,
-        collaborators: updatedProject.collaborators
+        collaborators: updatedProject.collaborators,
+        categories: updatedProject.categories
       });
       
       // Update local state
@@ -195,7 +196,8 @@ export function useBoards(user) {
         selectedBoard.value = { 
           ...selectedBoard.value, 
           name: updatedProject.name,
-          collaborators: updatedProject.collaborators
+          collaborators: updatedProject.collaborators,
+          categories: updatedProject.categories
         };
       }
       
@@ -204,6 +206,7 @@ export function useBoards(user) {
       if (boardIndex !== -1) {
         boards.value[boardIndex].name = updatedProject.name;
         boards.value[boardIndex].collaborators = updatedProject.collaborators;
+        boards.value[boardIndex].categories = updatedProject.categories;
       }
     } catch (err) {
       error.value = err.message;

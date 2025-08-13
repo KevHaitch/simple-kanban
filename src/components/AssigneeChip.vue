@@ -1,5 +1,5 @@
 <template>
-  <div class="assignee-chip">
+  <div class="assignee-chip" :class="{ 'avatar-only': avatarOnly }">
     <div 
       class="assignee-initials" 
       :style="{ backgroundColor: initialsColor }"
@@ -7,9 +7,9 @@
     >
       {{ getInitials(email) }}
     </div>
-    <span class="assignee-name">{{ displayName }}</span>
+    <span v-if="!avatarOnly" class="assignee-name">{{ displayName }}</span>
     <button
-      v-if="removable"
+      v-if="removable && !avatarOnly"
       @click.stop="$emit('remove', email)"
       class="remove-button"
     >
@@ -33,15 +33,48 @@ export default {
     removable: {
       type: Boolean,
       default: false
+    },
+    avatarOnly: {
+      type: Boolean,
+      default: false
+    },
+    boardCollaborators: {
+      type: Array,
+      default: () => []
     }
   },
   setup(props) {
     // Initialize with the first name from email as fallback
     const displayName = ref(userStore.getFirstNameFromEmail(props.email));
     
-    // Get color directly from colorService - this is not reactive
-    // We use a ref instead of computed to avoid unnecessary reactivity
-    const initialsColor = ref(colorService.getColorForEmail(props.email));
+    // Get color from board collaborators first, then fall back to colorService
+    const initialsColor = computed(() => {
+      console.log(`AssigneeChip debug for ${props.email}:`, {
+        boardCollaborators: props.boardCollaborators,
+        boardCollaboratorsLength: props.boardCollaborators?.length
+      });
+      
+      // For boardCollaborators passed from the parent, look for the color
+      // This could be either the collaboratorDetails array or legacy format
+      if (props.boardCollaborators && props.boardCollaborators.length > 0) {
+        const collaborator = props.boardCollaborators.find(collab => 
+          (typeof collab === 'object' && collab.email === props.email) ||
+          (typeof collab === 'string' && collab === props.email)
+        );
+        
+        console.log(`Found collaborator for ${props.email}:`, collaborator);
+        
+        if (collaborator && typeof collaborator === 'object' && collaborator.color) {
+          console.log(`Using board color for ${props.email}:`, collaborator.color);
+          return collaborator.color;
+        }
+      }
+      
+      // Fall back to colorService for consistent colors
+      const fallbackColor = colorService.getColorForEmail(props.email);
+      console.log(`Using fallback color for ${props.email}:`, fallbackColor);
+      return fallbackColor;
+    });
     
     onMounted(async () => {
       try {
@@ -92,6 +125,14 @@ export default {
   position: relative; /* For proper positioning of the remove button */
 }
 
+.assignee-chip.avatar-only {
+  background: transparent;
+  padding: 0;
+  height: 26px;
+  width: 26px;
+  border-radius: 50%;
+}
+
 .assignee-initials {
   width: 24px;
   height: 24px;
@@ -104,6 +145,12 @@ export default {
   color: #fff;
   margin-right: 8px;
   flex-shrink: 0;
+}
+
+.assignee-chip.avatar-only .assignee-initials {
+  width: 26px;
+  height: 26px;
+  margin-right: 0;
 }
 
 .assignee-name {

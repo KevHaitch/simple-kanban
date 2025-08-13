@@ -8,7 +8,9 @@
     @click="$emit('click', task)"
   >
     <div class="task-header">
-      <h3 class="task-title">{{ task.title }}</h3>
+      <h3 class="task-title" :class="{ 'empty-title': !task.title.trim() }">
+        {{ task.title.trim() || 'Click to add title...' }}
+      </h3>
     </div>
     
     <div v-if="task.description" class="task-description">
@@ -16,13 +18,23 @@
     </div>
     
     <div class="task-footer">
-      <div v-if="task.assignees && task.assignees.length > 0" class="assignees-container">
-        <assignee-chip
-          v-for="email in task.assignees" 
-          :key="email"
-          :email="email"
-          :projectId="boardId"
-          :removable="false"
+      <div class="assignees-category-row">
+        <div v-if="task.assignees && task.assignees.length > 0" class="assignees-container">
+          <assignee-chip
+            v-for="email in task.assignees" 
+            :key="email"
+            :email="email"
+            :projectId="boardId"
+            :removable="false"
+            :avatar-only="true"
+            :board-collaborators="boardCollaborators"
+          />
+        </div>
+        
+        <category-chip 
+          :category="task.category || 'General'" 
+          :clickable="false"
+          :board-categories="boardCategories"
         />
       </div>
       
@@ -36,11 +48,13 @@
 <script>
 import { ref } from 'vue';
 import AssigneeChip from './AssigneeChip.vue';
+import CategoryChip from './CategoryChip.vue';
 
 export default {
   name: 'TaskCard',
   components: {
-    AssigneeChip
+    AssigneeChip,
+    CategoryChip
   },
   props: {
     task: {
@@ -50,6 +64,14 @@ export default {
     boardId: {
       type: String,
       required: true
+    },
+    boardCollaborators: {
+      type: Array,
+      default: () => []
+    },
+    boardCategories: {
+      type: Array,
+      default: () => []
     }
   },
   setup(props) {
@@ -139,6 +161,12 @@ export default {
   line-height: 1.4;
 }
 
+.task-title.empty-title {
+  color: #6c6c84;
+  font-style: italic;
+  opacity: 0.8;
+}
+
 .task-description {
   font-size: 0.8rem;
   color: #a1a1b5;
@@ -153,9 +181,15 @@ export default {
 
 .task-footer {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
+  flex-direction: column;
   margin-top: auto;
+  gap: 8px;
+}
+
+.assignees-category-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   gap: 8px;
 }
 

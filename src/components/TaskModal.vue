@@ -29,7 +29,7 @@
           <textarea
             v-model="localTask.title"
             @input="onTitleInput"
-            placeholder="Task name"
+            placeholder="Enter task title..."
             class="title-input"
             rows="1"
             ref="titleTextarea"
@@ -48,30 +48,42 @@
         </div>
         
         <div class="mb-4 relative">
-          <div class="assignee-section">
-            <button 
-              @click.stop="toggleAssigneeDropdown" 
-              class="assign-button"
-            >
-              Assign
-              <svg xmlns="http://www.w3.org/2000/svg" class="plus-icon" viewBox="0 0 20 20" fill="currentColor">
-                <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" />
-              </svg>
-            </button>
-            <div class="assignee-container">
-              <div v-if="localTask.assignees.length > 0" class="assignee-chips">
-                <assignee-chip
-                  v-for="email in localTask.assignees"
-                  :key="email"
-                  :email="email"
-                  :projectId="boardId"
-                  :removable="true"
-                  @remove="removeAssignee"
-                />
+          <div class="assignee-category-section">
+            <div class="assignee-section">
+              <button 
+                @click.stop="toggleAssigneeDropdown" 
+                class="assign-button"
+              >
+                Assign
+                <svg xmlns="http://www.w3.org/2000/svg" class="plus-icon" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" />
+                </svg>
+              </button>
+              <div class="assignee-container">
+                <div v-if="localTask.assignees.length > 0" class="assignee-chips">
+                  <assignee-chip
+                    v-for="email in localTask.assignees"
+                    :key="email"
+                    :email="email"
+                    :projectId="boardId"
+                    :removable="true"
+                    :board-collaborators="projectCollaborators"
+                    @remove="removeAssignee"
+                  />
+                </div>
+                <div v-else class="no-assignees">
+                  <span>No one assigned</span>
+                </div>
               </div>
-              <div v-else class="no-assignees">
-                <span>No one assigned</span>
-              </div>
+            </div>
+            
+            <div class="category-section">
+              <category-chip 
+                :category="localTask.category || 'General'" 
+                :board-categories="availableCategories"
+                :clickable="true"
+                @click="toggleCategoryDropdown"
+              />
             </div>
           </div>
           <div v-if="showAssigneeDropdown" class="assignee-popover">
@@ -86,12 +98,31 @@
                   :email="email"
                   :projectId="boardId"
                   :removable="false"
+                  :board-collaborators="projectCollaborators"
                   class="popover-chip"
                 />
               </div>
             </div>
             <div v-else class="no-results">
               All available users are already assigned
+            </div>
+          </div>
+          
+          <div v-if="showCategoryDropdown" class="category-popover">
+            <div class="category-list">
+              <div 
+                v-for="category in availableCategories" 
+                :key="category.id"
+                @click.stop="selectCategory(category)"
+                class="category-list-item"
+                :class="{ 'selected': localTask.category === category.id || localTask.category === category.name }"
+              >
+                <category-chip 
+                  :category="category" 
+                  :board-categories="availableCategories"
+                  :clickable="false"
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -143,6 +174,7 @@ import { doc, deleteDoc, getDoc } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import debounce from 'lodash/debounce';
 import AssigneeChip from './AssigneeChip.vue';
+import CategoryChip from './CategoryChip.vue';
 import userStore from '../userStore';
 
 export default {
@@ -152,7 +184,8 @@ export default {
     DialogPanel,
     DialogTitle,
     TrashIcon,
-    AssigneeChip
+    AssigneeChip,
+    CategoryChip
   },
   props: ['task', 'boardId'],
   emits: ['close', 'save', 'delete'],
@@ -165,7 +198,11 @@ export default {
     const statuses = ['backlog', 'ready', 'in-progress', 'review', 'qa', 'done'];
     const showDeleteConfirmation = ref(false);
     const showAssigneeDropdown = ref(false);
+    const showCategoryDropdown = ref(false);
     const availableAssignees = ref([]);
+    const availableCategories = ref([
+      { id: 'general', name: 'General', color: '#3b82f6' }
+    ]);
     const projectOwnerEmail = ref('');
     const projectCollaborators = ref([]);
     const titleTextarea = ref(null);
@@ -197,9 +234,21 @@ export default {
         nextTick(() => {
           if (titleTextarea.value) adjustTextareaHeight(titleTextarea.value);
           if (descriptionTextarea.value) adjustTextareaHeight(descriptionTextarea.value);
+          
+          // Auto-focus title field for new tasks (empty title)
+          if (!localTask.value.title.trim()) {
+            titleTextarea.value?.focus();
+          }
         });
       }
     }, { immediate: true });
+
+    // Watch for boardId changes to refetch project data (categories, assignees)
+    watch(() => props.boardId, async (newBoardId) => {
+      if (newBoardId) {
+        await fetchProjectData();
+      }
+    });
 
     // Computed property to get available assignees that aren't already assigned
     const availableAssigneesToShow = computed(() => {
@@ -222,6 +271,16 @@ export default {
       document.addEventListener('click', closeDropdownOnClickOutside, true);
       adjustTextareaHeight(titleTextarea.value);
       adjustTextareaHeight(descriptionTextarea.value);
+      
+      // Auto-focus title field for new tasks (empty title)
+      if (!localTask.value.title.trim()) {
+        nextTick(() => {
+          if (titleTextarea.value) {
+            titleTextarea.value.focus();
+            titleTextarea.value.select(); // Select placeholder text if any
+          }
+        });
+      }
     });
 
     onBeforeUnmount(() => {
@@ -233,16 +292,31 @@ export default {
         const projectDoc = await getDoc(doc(db, 'boards', props.boardId));
         if (projectDoc.exists()) {
           const projectData = projectDoc.data();
-          projectCollaborators.value = projectData.collaborators || [];
+          // Use collaboratorDetails for colors, fall back to collaborators for backwards compatibility
+          projectCollaborators.value = projectData.collaboratorDetails || projectData.collaborators || [];
           projectOwnerEmail.value = projectData.ownerEmail || '';
+          
+          // Set available categories from board data
+          availableCategories.value = projectData.categories || [
+            { id: 'general', name: 'General', color: '#3b82f6' },
+            { id: 'bug', name: 'Bug', color: '#ef4444' },
+            { id: 'feature', name: 'Feature', color: '#10b981' },
+            { id: 'documentation', name: 'Documentation', color: '#f59e0b' },
+            { id: 'research', name: 'Research', color: '#8b5cf6' }
+          ];
           
           // Get the current user's email
           const currentUserEmail = auth.currentUser?.email;
           
+          // Extract emails from collaborator objects or use strings directly
+          const collaboratorEmails = projectCollaborators.value.map(collab => 
+            typeof collab === 'object' ? collab.email : collab
+          );
+          
           // Create a Set to ensure uniqueness
           const uniqueAssignees = new Set([
             projectOwnerEmail.value,
-            ...projectCollaborators.value,
+            ...collaboratorEmails,
             currentUserEmail // Add current user
           ].filter(Boolean)); // Remove any null/undefined values
           
@@ -255,21 +329,20 @@ export default {
     };
     
     const closeDropdownOnClickOutside = (event) => {
-      // If the dropdown is not shown, no need to check
-      if (!showAssigneeDropdown.value) return;
+      // Check if either dropdown is shown
+      if (!showAssigneeDropdown.value && !showCategoryDropdown.value) return;
       
-      // Don't close if clicking on the assign button (toggle behavior)
-      if (event.target.closest('.assign-button')) {
+      // Don't close if clicking on buttons or inside dropdowns
+      if (event.target.closest('.assign-button') || 
+          event.target.closest('.assignee-popover') ||
+          event.target.closest('.category-section') ||
+          event.target.closest('.category-popover')) {
         return;
       }
       
-      // Don't close if clicking inside the popover
-      if (event.target.closest('.assignee-popover')) {
-        return;
-      }
-      
-      // Close the dropdown for any other clicks
+      // Close both dropdowns for any other clicks
       showAssigneeDropdown.value = false;
+      showCategoryDropdown.value = false;
     };
 
     const debouncedSave = debounce(() => {
@@ -281,7 +354,7 @@ export default {
       
       // Always emit save event to ensure changes are saved
       emit('save', { ...localTask.value });
-    }, 1000);
+    }, 500);
 
     // Add a method to force save when modal is closing
     const forceSave = () => {
@@ -368,6 +441,19 @@ export default {
 
     const toggleAssigneeDropdown = () => {
       showAssigneeDropdown.value = !showAssigneeDropdown.value;
+      showCategoryDropdown.value = false; // Close category dropdown
+    };
+
+    const toggleCategoryDropdown = () => {
+      showCategoryDropdown.value = !showCategoryDropdown.value;
+      showAssigneeDropdown.value = false; // Close assignee dropdown
+    };
+
+    const selectCategory = (category) => {
+      // Store the category ID for consistency with database
+      localTask.value.category = typeof category === 'object' ? category.id : category;
+      showCategoryDropdown.value = false;
+      forceSave();
     };
 
     const handleClose = () => {
@@ -380,8 +466,10 @@ export default {
       statuses,
       showDeleteConfirmation,
       showAssigneeDropdown,
+      showCategoryDropdown,
       availableAssignees,
       availableAssigneesToShow,
+      availableCategories,
       titleTextarea,
       descriptionTextarea,
       handleStatusChange,
@@ -395,6 +483,8 @@ export default {
       openDeleteConfirmation,
       deleteTask,
       toggleAssigneeDropdown,
+      toggleCategoryDropdown,
+      selectCategory,
       forceSave,
       handleClose,
     };
@@ -707,12 +797,26 @@ label {
 }
 
 /* Assignee Selector Styles */
+.assignee-category-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
 .assignee-section {
   display: flex;
   align-items: flex-start;
   margin-top: 0.5rem;
   position: relative;
   gap: 12px;
+  flex: 1;
+}
+
+.category-section {
+  display: flex;
+  align-items: center;
+  margin-top: 0.5rem;
 }
 
 .assignee-container {
@@ -813,5 +917,60 @@ label {
 
 .popover-chip {
   display: inline-flex;
+}
+
+/* Category Dropdown Styles */
+.category-popover {
+  position: absolute;
+  bottom: 100%;
+  right: 0;
+  width: auto;
+  max-width: 400px;
+  background-color: rgba(26, 26, 39, 0.25);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-radius: 8px;
+  z-index: 10;
+  margin-bottom: 12px;
+  box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.3);
+  padding: 12px;
+}
+
+.category-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+}
+
+.category-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.category-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.category-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 3px;
+}
+
+.category-list-item {
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  padding: 4px;
+}
+
+.category-list-item:hover {
+  background-color: rgba(99, 102, 241, 0.2);
+}
+
+.category-list-item.selected {
+  background-color: rgba(99, 102, 241, 0.3);
 }
 </style>
