@@ -77,16 +77,18 @@ export default {
   },
   emits: ['close', 'create', 'update'],
   data() {
+    const initialCategories = this.project && this.project.categories ? this.project.categories : [
+      { id: 'general', name: 'General', color: '#3b82f6' },
+      { id: 'bug', name: 'Bug', color: '#ef4444' },
+      { id: 'feature', name: 'Feature', color: '#10b981' },
+      { id: 'documentation', name: 'Documentation', color: '#f59e0b' },
+      { id: 'research', name: 'Research', color: '#8b5cf6' }
+    ];
+    
     return {
       projectName: this.project ? this.project.name : '',
       collaborators: [],
-      categories: this.project && this.project.categories ? this.project.categories : [
-        { id: 'general', name: 'General', color: '#3b82f6' },
-        { id: 'bug', name: 'Bug', color: '#ef4444' },
-        { id: 'feature', name: 'Feature', color: '#10b981' },
-        { id: 'documentation', name: 'Documentation', color: '#f59e0b' },
-        { id: 'research', name: 'Research', color: '#8b5cf6' }
-      ],
+      categories: initialCategories,
     };
   },
   mounted() {
@@ -105,6 +107,7 @@ export default {
       // Use collaboratorDetails first, fall back to collaborators for backwards compatibility
       const collaboratorData = newProject && (newProject.collaboratorDetails || newProject.collaborators);
       this.collaborators = collaboratorData ? this.convertCollaborators(collaboratorData) : [];
+      
       this.categories = newProject && newProject.categories ? newProject.categories : [
         { id: 'general', name: 'General', color: '#3b82f6' },
         { id: 'bug', name: 'Bug', color: '#ef4444' },

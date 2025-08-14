@@ -4,36 +4,42 @@
     
     <div class="fixed inset-0 flex items-center justify-center p-4">
       <DialogPanel class="modal-content">
-        <div class="status-row">
-          <label>
-            <span class="sr-only">Status</span>
-            <select v-model="localTask.status" @change="handleStatusChange" class="status-select">
-              <option value="backlog">Backlog</option>
-              <option value="ready">Ready</option>
-              <option value="in-progress">In Progress</option>
-              <option value="review">Review</option>
-              <option value="qa">QA</option>
-              <option value="done">Done</option>
-            </select>
-          </label>
-          <button
-            v-if="localTask.status !== 'done'"
-            @click="advanceStatus"
-            class="next-btn"
-          >
-            Next →
-          </button>
-        </div>
-        
-        <div class="title-container">
-          <textarea
-            v-model="localTask.title"
-            @input="onTitleInput"
-            placeholder="Enter task title..."
-            class="title-input"
-            rows="1"
-            ref="titleTextarea"
-          ></textarea>
+        <div class="status-title-row">
+          <div class="title-container">
+            <textarea
+              v-model="localTask.title"
+              @input="onTitleInput"
+              placeholder="Enter task title..."
+              class="title-input"
+              rows="1"
+              ref="titleTextarea"
+            ></textarea>
+          </div>
+          
+          <div class="status-dropdown-container">
+            <button 
+              @click="toggleStatusDropdown" 
+              class="status-dropdown-button"
+              :class="{ 'dropdown-open': showStatusDropdown }"
+            >
+              <span class="status-text">{{ getStatusDisplayName(localTask.status) }}</span>
+              <svg class="dropdown-caret" :class="{ 'rotated': showStatusDropdown }" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+              </svg>
+            </button>
+            
+            <div v-if="showStatusDropdown" class="status-dropdown-menu">
+              <div 
+                v-for="status in statusOptions" 
+                :key="status.value"
+                @click="selectStatus(status.value)"
+                class="status-dropdown-item"
+                :class="{ 'selected': localTask.status === status.value }"
+              >
+                {{ status.label }}
+              </div>
+            </div>
+          </div>
         </div>
         
         <div class="description-container">
@@ -60,19 +66,16 @@
                 </svg>
               </button>
               <div class="assignee-container">
-                <div v-if="localTask.assignees.length > 0" class="assignee-chips">
+                <div class="assignee-chips">
                   <assignee-chip
                     v-for="email in localTask.assignees"
                     :key="email"
                     :email="email"
                     :projectId="boardId"
                     :removable="true"
-                    :board-collaborators="projectCollaborators"
+                    :boardCollaborators="projectCollaborators"
                     @remove="removeAssignee"
                   />
-                </div>
-                <div v-else class="no-assignees">
-                  <span>No one assigned</span>
                 </div>
               </div>
             </div>
@@ -98,7 +101,7 @@
                   :email="email"
                   :projectId="boardId"
                   :removable="false"
-                  :board-collaborators="projectCollaborators"
+                  :boardCollaborators="projectCollaborators"
                   class="popover-chip"
                 />
               </div>
@@ -109,26 +112,31 @@
           </div>
           
           <div v-if="showCategoryDropdown" class="category-popover">
-            <div class="category-list">
+            <div class="category-chips-grid">
               <div 
                 v-for="category in availableCategories" 
                 :key="category.id"
                 @click.stop="selectCategory(category)"
-                class="category-list-item"
+                class="category-chip-item"
                 :class="{ 'selected': localTask.category === category.id || localTask.category === category.name }"
+                :style="{ backgroundColor: category.color }"
               >
-                <category-chip 
-                  :category="category" 
-                  :board-categories="availableCategories"
-                  :clickable="false"
-                />
+                <span class="category-chip-name">{{ category.name }}</span>
+                <div 
+                  v-if="localTask.category === category.id || localTask.category === category.name"
+                  class="category-check"
+                >
+                  <svg class="check-icon" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                  </svg>
+                </div>
               </div>
             </div>
           </div>
         </div>
         
         <div class="footer-info">
-          <p class="created-at">Created: {{ formatCreatedAt(localTask.createdAt) }}</p>
+          <p class="created-at">Created: {{ formatCreatedAt(localTask.createdAt) }}{{ localTask.createdByName ? ` by ${getCreatorShortName(localTask.createdByName)}` : '' }}</p>
           <p v-if="localTask.completedAt" class="completed-at">
             Completed: {{ formatCreatedAt(localTask.completedAt) }}
           </p>
@@ -187,7 +195,7 @@ export default {
     AssigneeChip,
     CategoryChip
   },
-  props: ['task', 'boardId'],
+  props: ['task', 'boardId', 'boardCollaborators', 'boardCategories'],
   emits: ['close', 'save', 'delete'],
   setup(props, { emit }) {
     const localTask = ref({
@@ -196,15 +204,31 @@ export default {
       completedAt: props.task.completedAt || null,
     });
     const statuses = ['backlog', 'ready', 'in-progress', 'review', 'qa', 'done'];
+    const statusOptions = [
+      { value: 'backlog', label: 'Backlog' },
+      { value: 'ready', label: 'Ready' },
+      { value: 'in-progress', label: 'In Progress' },
+      { value: 'review', label: 'Review' },
+      { value: 'qa', label: 'QA' },
+      { value: 'done', label: 'Done' }
+    ];
     const showDeleteConfirmation = ref(false);
     const showAssigneeDropdown = ref(false);
     const showCategoryDropdown = ref(false);
+    const showStatusDropdown = ref(false);
     const availableAssignees = ref([]);
-    const availableCategories = ref([
-      { id: 'general', name: 'General', color: '#3b82f6' }
-    ]);
+    const availableCategories = ref(props.boardCategories && props.boardCategories.length > 0 
+      ? props.boardCategories 
+      : [
+          { id: 'general', name: 'General', color: '#3b82f6' },
+          { id: 'bug', name: 'Bug', color: '#ef4444' },
+          { id: 'feature', name: 'Feature', color: '#10b981' },
+          { id: 'documentation', name: 'Documentation', color: '#f59e0b' },
+          { id: 'research', name: 'Research', color: '#8b5cf6' }
+        ]
+    );
     const projectOwnerEmail = ref('');
-    const projectCollaborators = ref([]);
+    const projectCollaborators = ref(props.boardCollaborators || []);
     const titleTextarea = ref(null);
     const descriptionTextarea = ref(null);
     const isInitialLoad = ref(true);
@@ -235,8 +259,8 @@ export default {
           if (titleTextarea.value) adjustTextareaHeight(titleTextarea.value);
           if (descriptionTextarea.value) adjustTextareaHeight(descriptionTextarea.value);
           
-          // Auto-focus title field for new tasks (empty title)
-          if (!localTask.value.title.trim()) {
+          // Auto-focus title field when title is empty
+          if (localTask.value.title.trim() === "") {
             titleTextarea.value?.focus();
           }
         });
@@ -247,6 +271,29 @@ export default {
     watch(() => props.boardId, async (newBoardId) => {
       if (newBoardId) {
         await fetchProjectData();
+      }
+    });
+
+    // Watch for boardCollaborators prop changes
+    watch(() => props.boardCollaborators, (newCollaborators) => {
+      if (newCollaborators) {
+        projectCollaborators.value = newCollaborators;
+      }
+    });
+
+    // Watch for boardCategories prop changes
+    watch(() => props.boardCategories, (newCategories) => {
+      if (newCategories && newCategories.length > 0) {
+        availableCategories.value = newCategories;
+      } else {
+        // Fallback to default categories if none provided
+        availableCategories.value = [
+          { id: 'general', name: 'General', color: '#3b82f6' },
+          { id: 'bug', name: 'Bug', color: '#ef4444' },
+          { id: 'feature', name: 'Feature', color: '#10b981' },
+          { id: 'documentation', name: 'Documentation', color: '#f59e0b' },
+          { id: 'research', name: 'Research', color: '#8b5cf6' }
+        ];
       }
     });
 
@@ -272,8 +319,8 @@ export default {
       adjustTextareaHeight(titleTextarea.value);
       adjustTextareaHeight(descriptionTextarea.value);
       
-      // Auto-focus title field for new tasks (empty title)
-      if (!localTask.value.title.trim()) {
+      // Auto-focus title field when title is empty
+      if (localTask.value.title.trim() === "") {
         nextTick(() => {
           if (titleTextarea.value) {
             titleTextarea.value.focus();
@@ -292,18 +339,24 @@ export default {
         const projectDoc = await getDoc(doc(db, 'boards', props.boardId));
         if (projectDoc.exists()) {
           const projectData = projectDoc.data();
-          // Use collaboratorDetails for colors, fall back to collaborators for backwards compatibility
-          projectCollaborators.value = projectData.collaboratorDetails || projectData.collaborators || [];
+          
+          // Only update projectCollaborators if not already set from props
+          if (!props.boardCollaborators || props.boardCollaborators.length === 0) {
+            projectCollaborators.value = projectData.collaboratorDetails || projectData.collaborators || [];
+          }
+          
           projectOwnerEmail.value = projectData.ownerEmail || '';
           
-          // Set available categories from board data
-          availableCategories.value = projectData.categories || [
-            { id: 'general', name: 'General', color: '#3b82f6' },
-            { id: 'bug', name: 'Bug', color: '#ef4444' },
-            { id: 'feature', name: 'Feature', color: '#10b981' },
-            { id: 'documentation', name: 'Documentation', color: '#f59e0b' },
-            { id: 'research', name: 'Research', color: '#8b5cf6' }
-          ];
+          // Only update availableCategories if not already set from props
+          if (!props.boardCategories || props.boardCategories.length === 0) {
+            availableCategories.value = projectData.categories || [
+              { id: 'general', name: 'General', color: '#3b82f6' },
+              { id: 'bug', name: 'Bug', color: '#ef4444' },
+              { id: 'feature', name: 'Feature', color: '#10b981' },
+              { id: 'documentation', name: 'Documentation', color: '#f59e0b' },
+              { id: 'research', name: 'Research', color: '#8b5cf6' }
+            ];
+          }
           
           // Get the current user's email
           const currentUserEmail = auth.currentUser?.email;
@@ -329,20 +382,22 @@ export default {
     };
     
     const closeDropdownOnClickOutside = (event) => {
-      // Check if either dropdown is shown
-      if (!showAssigneeDropdown.value && !showCategoryDropdown.value) return;
+      // Check if any dropdown is shown
+      if (!showAssigneeDropdown.value && !showCategoryDropdown.value && !showStatusDropdown.value) return;
       
       // Don't close if clicking on buttons or inside dropdowns
       if (event.target.closest('.assign-button') || 
           event.target.closest('.assignee-popover') ||
           event.target.closest('.category-section') ||
-          event.target.closest('.category-popover')) {
+          event.target.closest('.category-popover') ||
+          event.target.closest('.status-dropdown-container')) {
         return;
       }
       
-      // Close both dropdowns for any other clicks
+      // Close all dropdowns for any other clicks
       showAssigneeDropdown.value = false;
       showCategoryDropdown.value = false;
+      showStatusDropdown.value = false;
     };
 
     const debouncedSave = debounce(() => {
@@ -408,8 +463,17 @@ export default {
 
     const adjustTextareaHeight = (textarea) => {
       if (!textarea) return;
-      textarea.style.height = 'auto';
-      textarea.style.height = textarea.scrollHeight + 'px';
+      
+      // For title textarea, respect the min-height of 40px
+      if (textarea === titleTextarea.value) {
+        textarea.style.height = 'auto';
+        const scrollHeight = textarea.scrollHeight;
+        textarea.style.height = Math.max(40, scrollHeight) + 'px';
+      } else {
+        // For description textarea, use normal auto-sizing
+        textarea.style.height = 'auto';
+        textarea.style.height = textarea.scrollHeight + 'px';
+      }
     };
 
     const onTitleInput = (e) => {
@@ -442,11 +506,13 @@ export default {
     const toggleAssigneeDropdown = () => {
       showAssigneeDropdown.value = !showAssigneeDropdown.value;
       showCategoryDropdown.value = false; // Close category dropdown
+      showStatusDropdown.value = false; // Close status dropdown
     };
 
     const toggleCategoryDropdown = () => {
       showCategoryDropdown.value = !showCategoryDropdown.value;
       showAssigneeDropdown.value = false; // Close assignee dropdown
+      showStatusDropdown.value = false; // Close status dropdown
     };
 
     const selectCategory = (category) => {
@@ -454,6 +520,36 @@ export default {
       localTask.value.category = typeof category === 'object' ? category.id : category;
       showCategoryDropdown.value = false;
       forceSave();
+    };
+
+    const toggleStatusDropdown = () => {
+      showStatusDropdown.value = !showStatusDropdown.value;
+      showAssigneeDropdown.value = false; // Close assignee dropdown
+      showCategoryDropdown.value = false; // Close category dropdown
+    };
+
+    const selectStatus = (status) => {
+      localTask.value.status = status;
+      showStatusDropdown.value = false;
+      handleStatusChange();
+    };
+
+    const getStatusDisplayName = (status) => {
+      const statusOption = statusOptions.find(option => option.value === status);
+      return statusOption ? statusOption.label : status;
+    };
+
+    const getCreatorShortName = (createdByName) => {
+      if (!createdByName) return '';
+      
+      // If it's an email, extract the part before @
+      if (createdByName.includes('@')) {
+        return createdByName.split('@')[0];
+      }
+      
+      // If it's a display name, return first name only
+      const nameParts = createdByName.split(' ');
+      return nameParts[0];
     };
 
     const handleClose = () => {
@@ -464,12 +560,15 @@ export default {
     return {
       localTask,
       statuses,
+      statusOptions,
       showDeleteConfirmation,
       showAssigneeDropdown,
       showCategoryDropdown,
+      showStatusDropdown,
       availableAssignees,
       availableAssigneesToShow,
       availableCategories,
+      projectCollaborators,
       titleTextarea,
       descriptionTextarea,
       handleStatusChange,
@@ -485,6 +584,10 @@ export default {
       toggleAssigneeDropdown,
       toggleCategoryDropdown,
       selectCategory,
+      toggleStatusDropdown,
+      selectStatus,
+      getStatusDisplayName,
+      getCreatorShortName,
       forceSave,
       handleClose,
     };
@@ -533,23 +636,25 @@ label {
   color: #a1a1b5;
 }
 
-/* Status Row */
-.status-row {
+/* Status Title Row */
+.status-title-row {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
   margin-top: 0;
   margin-bottom: 1.75rem;
 }
 
-.status-row label {
-  flex-grow: 1;
-  margin: 0;
+.status-dropdown-container {
+  position: relative;
+  flex-shrink: 0;
 }
 
-.status-select {
-  height: 2.5rem;
-  padding: 0 1rem;
+.status-dropdown-button {
+  height: 40px;
+  min-width: 120px;
+  width: max-content;
+  padding: 0 1rem 0 1rem;
   border: 1px solid #2d2d3a;
   border-radius: 8px;
   background-color: #252535;
@@ -558,46 +663,83 @@ label {
   font-size: 0.95rem;
   cursor: pointer;
   transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  text-align: left;
 }
 
-.status-select:focus {
-  outline: none;
+.status-dropdown-button:hover {
+  background-color: #2a2a3e;
+  border-color: #3a3a4e;
+}
+
+.status-dropdown-button.dropdown-open {
   border-color: #6366f1;
   box-shadow: 0 0 0 3px rgba(86, 77, 182, 0.25);
 }
 
-.next-btn {
-  height: 2.5rem;
-  width: 5rem;
-  padding: 0 0.75rem;
-  margin-left: 0.75rem;
-  background-color: #6366f1;
-  color: #FFFFFF;
+.status-text {
+  flex: 1;
+}
+
+.dropdown-caret {
+  width: 16px;
+  height: 16px;
+  margin-left: 12px;
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+}
+
+.dropdown-caret.rotated {
+  transform: rotate(180deg);
+}
+
+.status-dropdown-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background-color: rgba(26, 26, 39, 0.95);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   border-radius: 8px;
-  font-family: 'Poppins', sans-serif;
-  font-weight: 500;
-  font-size: 0.9rem;
-  transition: all 0.2s ease;
-  border: none;
+  border: 1px solid #2d2d3a;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  z-index: 10;
+  margin-top: 4px;
+  overflow: hidden;
+}
+
+.status-dropdown-item {
+  padding: 0.75rem 1rem;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  transition: all 0.2s ease;
+  font-size: 0.95rem;
+  color: #e6e6e9;
+  border-bottom: 1px solid rgba(45, 45, 58, 0.5);
 }
 
-.next-btn:hover {
-  background-color: #4f46e5;
-  transform: translateY(-1px);
+.status-dropdown-item:last-child {
+  border-bottom: none;
 }
 
-.next-btn:focus {
-  outline: none;
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.3);
+.status-dropdown-item:hover {
+  background-color: rgba(99, 102, 241, 0.1);
+  color: #ffffff;
 }
+
+.status-dropdown-item.selected {
+  background-color: rgba(99, 102, 241, 0.2);
+  color: #6366f1;
+  font-weight: 500;
+}
+
+
 
 /* Title Styling */
 .title-container {
-  margin-bottom: 1rem;
+  flex-grow: 1;
 }
 
 .title-input {
@@ -608,13 +750,13 @@ label {
   font-family: 'Poppins', sans-serif;
   font-size: 1.25rem;
   font-weight: 600;
-  padding: 0.5rem;
+  padding: 4px 0.5rem; /* 4px top/bottom + 32px line-height = 40px total */
   transition: all 0.2s ease;
   resize: none;
   overflow: hidden;
   display: block;
-  line-height: 1.5;
-  min-height: 1.5rem;
+  line-height: 32px; /* 32px line-height + 8px padding = 40px total */
+  min-height: 40px !important; /* Force min-height to match status dropdown */
   box-sizing: border-box;
 }
 
@@ -832,14 +974,7 @@ label {
   flex: 1;
 }
 
-.no-assignees {
-  flex: 1;
-  line-height:30px;
-  display: flex;
-  align-items: center;
-  color: #6c6c84;
-  font-size: 0.9rem;
-}
+
 
 .assign-button {
   height: 30px;
@@ -933,44 +1068,76 @@ label {
   z-index: 10;
   margin-bottom: 12px;
   box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.3);
-  padding: 12px;
+  padding: 14px 12px 12px 12px;
 }
 
-.category-list {
+.category-chips-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  grid-template-columns: 1fr 1fr;
   gap: 8px;
   max-height: 200px;
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+  padding-top: 2px;
 }
 
-.category-list::-webkit-scrollbar {
+.category-chips-grid::-webkit-scrollbar {
   width: 6px;
 }
 
-.category-list::-webkit-scrollbar-track {
+.category-chips-grid::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.category-list::-webkit-scrollbar-thumb {
+.category-chips-grid::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.3);
   border-radius: 3px;
 }
 
-.category-list-item {
+.category-chip-item {
+  width: 100px;
+  height: 26px;
+  border-radius: 13px;
+  position: relative;
   cursor: pointer;
-  border-radius: 4px;
   transition: all 0.2s ease;
-  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px;
 }
 
-.category-list-item:hover {
-  background-color: rgba(99, 102, 241, 0.2);
+.category-chip-item:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  filter: brightness(1.1);
 }
 
-.category-list-item.selected {
-  background-color: rgba(99, 102, 241, 0.3);
+.category-chip-name {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.95);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  text-align: left;
 }
+
+.category-check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.check-icon {
+  width: 12px;
+  height: 12px;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+
 </style>

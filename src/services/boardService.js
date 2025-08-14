@@ -157,6 +157,13 @@ export function subscribeToOwnedBoards(userId, callback) {
           id: doc.id, 
           ...data, 
           collaborators: data.collaborators || [],
+          categories: data.categories || [
+            { id: 'general', name: 'General', color: '#3b82f6' },
+            { id: 'bug', name: 'Bug', color: '#ef4444' },
+            { id: 'feature', name: 'Feature', color: '#10b981' },
+            { id: 'documentation', name: 'Documentation', color: '#f59e0b' },
+            { id: 'research', name: 'Research', color: '#8b5cf6' }
+          ],
           isOwner: true 
         };
       });
@@ -193,6 +200,13 @@ export function subscribeToCollaboratorBoards(userEmail, callback) {
         return { 
           id: doc.id, 
           ...data,
+          categories: data.categories || [
+            { id: 'general', name: 'General', color: '#3b82f6' },
+            { id: 'bug', name: 'Bug', color: '#ef4444' },
+            { id: 'feature', name: 'Feature', color: '#10b981' },
+            { id: 'documentation', name: 'Documentation', color: '#f59e0b' },
+            { id: 'research', name: 'Research', color: '#8b5cf6' }
+          ],
           isOwner: false 
         };
       });

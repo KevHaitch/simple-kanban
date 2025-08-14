@@ -1,11 +1,22 @@
 <template>
   <div class="assignee-chip" :class="{ 'avatar-only': avatarOnly }">
-    <div 
-      class="assignee-initials" 
-      :style="{ backgroundColor: initialsColor }"
-      :data-email="email"
-    >
-      {{ getInitials(email) }}
+    <div class="avatar-circle">
+      <img 
+        v-if="userProfile?.photoURL && !imageError" 
+        :src="getOptimizedImageUrl(userProfile.photoURL)" 
+        :alt="displayName || email"
+        class="avatar-image"
+        crossorigin="anonymous"
+        referrerpolicy="no-referrer"
+        @error="onImageError"
+      />
+      <div 
+        v-else
+        class="avatar-fallback" 
+        :style="{ backgroundColor: fallbackColor }"
+      >
+        {{ getInitials(email) }}
+      </div>
     </div>
     <span v-if="!avatarOnly" class="assignee-name">{{ displayName }}</span>
     <button
@@ -19,7 +30,7 @@
 </template>
 
 <script>
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, watch } from 'vue';
 import userStore from '../userStore';
 import colorService from '../services/colorService';
 
@@ -46,48 +57,45 @@ export default {
   setup(props) {
     // Initialize with the first name from email as fallback
     const displayName = ref(userStore.getFirstNameFromEmail(props.email));
+    const userProfile = ref(null);
+    const imageError = ref(false);
     
-    // Get color from board collaborators first, then fall back to colorService
-    const initialsColor = computed(() => {
-      console.log(`AssigneeChip debug for ${props.email}:`, {
-        boardCollaborators: props.boardCollaborators,
-        boardCollaboratorsLength: props.boardCollaborators?.length
-      });
-      
+    // Get fallback color from board collaborators or colorService
+    const fallbackColor = computed(() => {
       // For boardCollaborators passed from the parent, look for the color
-      // This could be either the collaboratorDetails array or legacy format
       if (props.boardCollaborators && props.boardCollaborators.length > 0) {
         const collaborator = props.boardCollaborators.find(collab => 
           (typeof collab === 'object' && collab.email === props.email) ||
           (typeof collab === 'string' && collab === props.email)
         );
         
-        console.log(`Found collaborator for ${props.email}:`, collaborator);
-        
         if (collaborator && typeof collaborator === 'object' && collaborator.color) {
-          console.log(`Using board color for ${props.email}:`, collaborator.color);
           return collaborator.color;
         }
       }
       
       // Fall back to colorService for consistent colors
-      const fallbackColor = colorService.getColorForEmail(props.email);
-      console.log(`Using fallback color for ${props.email}:`, fallbackColor);
-      return fallbackColor;
+      return colorService.getColorForEmail(props.email);
     });
     
     onMounted(async () => {
       try {
-        // Try to get user profile from the store
-        const userProfile = await userStore.getUserByEmail(props.email);
+        // Get user profile from the store
+        const profile = await userStore.getUserByEmail(props.email);
+        userProfile.value = profile;
         
         // Use the first name if available
-        if (userProfile && userProfile.firstName) {
-          displayName.value = userProfile.firstName;
+        if (profile && profile.firstName) {
+          displayName.value = profile.firstName;
         }
       } catch (error) {
         console.error('Error getting user profile:', error);
       }
+    });
+    
+    // Reset image error when user profile changes
+    watch(userProfile, () => {
+      imageError.value = false;
     });
     
     function getInitials(email) {
@@ -103,39 +111,85 @@ export default {
       return username.charAt(0).toUpperCase();
     }
     
+    function getOptimizedImageUrl(photoURL) {
+      if (!photoURL) return null;
+      
+      // If it's a Google profile image, ensure it has the right parameters
+      if (photoURL.includes('googleusercontent.com')) {
+        // Remove existing size parameters and add our own
+        const baseUrl = photoURL.split('=')[0];
+        return `${baseUrl}=s48-c`; // 48px size, cropped
+      }
+      
+      return photoURL;
+    }
+    
+    function onImageError() {
+      console.log(`Image failed to load for ${props.email}:`, userProfile.value?.photoURL);
+      console.log(`Optimized URL was:`, getOptimizedImageUrl(userProfile.value?.photoURL));
+      imageError.value = true;
+    }
+    
     return {
       displayName,
+      userProfile,
+      imageError,
       getInitials,
-      initialsColor
+      getOptimizedImageUrl,
+      fallbackColor,
+      onImageError
     };
   }
 };
 </script>
 
 <style scoped>
+/* Base chip container - standardized 26px height */
 .assignee-chip {
   display: flex;
   align-items: center;
-  background-color: #2d2d3a;
-  height: 30px;
-  border-radius: 15px; /* 50% border radius */
-  padding: 3px;
-  max-width: 100%;
-  overflow: hidden; /* Ensure content doesn't overflow the rounded corners */
-  position: relative; /* For proper positioning of the remove button */
+  height: 28px;
+  background-color: #2a2a3e;
+  border-radius: 14px;
+  padding: 2px 8px 2px 2px;
+  margin-right: 0;
+  margin-bottom: 4px;
+  transition: background-color 0.2s;
 }
 
+.assignee-chip:hover {
+  cursor: arrow;
+}
+
+/* Avatar-only mode (task cards) */
 .assignee-chip.avatar-only {
-  background: transparent;
-  padding: 0;
-  height: 26px;
-  width: 26px;
+  padding: 2px;
+  border-radius: 50%;
+  margin:0;
+}
+
+/* Avatar circle - always 24px inside 26px container */
+.avatar-circle {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Avatar image */
+.avatar-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
   border-radius: 50%;
 }
 
-.assignee-initials {
-  width: 24px;
-  height: 24px;
+/* Avatar fallback (colored initials) */
+.avatar-fallback {
+  width: 100%;
+  height: 100%;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -143,48 +197,40 @@ export default {
   font-size: 0.75rem;
   font-weight: 600;
   color: #fff;
-  margin-right: 8px;
-  flex-shrink: 0;
 }
 
-.assignee-chip.avatar-only .assignee-initials {
-  width: 26px;
-  height: 26px;
-  margin-right: 0;
-}
-
+/* Name text (only in expanded mode) */
 .assignee-name {
   font-size: 0.75rem;
   color: #a1a1b5;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  padding-right: 10px; /* Add padding to the name instead of the container */
-  flex: 1;
+  margin-left:8px;
+  margin-right: 6px;
+  line-height: 1;
 }
 
+/* Remove button (only in expanded mode) */
 .remove-button {
-  margin-left: auto;
-  font-size: 1.25rem;
-  line-height: 30px;
+  background: none;
+  border: none;
   color: #a1a1b5;
   cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0;
+  width: 16px;
+  height: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 30px;
-  height: 30px;
-  padding: 0;
-  background: transparent;
-  border: none;
-  position: relative;
-  right: 0;
   border-radius: 50%;
-  transition: color 0.2s ease, background-color 0.2s ease;
+  transition: background-color 0.2s, color 0.2s;
+  flex-shrink: 0;
 }
 
 .remove-button:hover {
-  color: #ff5a65; /* Match the delete button color from TaskModal */
-  background-color: rgba(255, 90, 101, 0.1); /* Slight background highlight on hover */
+  cursor:pointer;
+  background-color: #ff4757;
+  color: #fff;
 }
 </style> 

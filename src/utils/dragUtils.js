@@ -40,8 +40,8 @@ export function styleGhostElements() {
       // Preserve the assignee chip colors
       preserveAssigneeColors(el);
       
-      // Hide most content within the ghost except for assignee chips
-      const children = el.querySelectorAll('*:not(.assignee-chip):not(.assignee-initials)');
+      // Hide most content within the ghost except for color elements
+      const children = el.querySelectorAll('*:not(.assignee-chip):not(.assignee-initials):not(.avatar-fallback):not(.category-chip)');
       children.forEach(child => {
         child.style.setProperty('visibility', 'hidden', 'important');
         child.style.setProperty('opacity', '0', 'important');
@@ -64,8 +64,8 @@ export function resetTaskStyling() {
       // Remove any lingering classes from dragging
       el.classList.remove('ghost-card', 'sortable-ghost', 'dragging', 'chosen');
       
-      // Also reset any children except assignee-initials (to preserve colors)
-      const children = el.querySelectorAll('*:not(.assignee-initials)');
+      // Also reset any children except color elements (to preserve colors)
+      const children = el.querySelectorAll('*:not(.assignee-initials):not(.avatar-fallback):not(.category-chip)');
       children.forEach(child => {
         child.removeAttribute('style');
       });
@@ -109,8 +109,8 @@ export function addGlobalDragStyles() {
       box-shadow: none !important;
     }
     
-    .ghost-card *:not(.assignee-chip):not(.assignee-initials), 
-    .sortable-ghost *:not(.assignee-chip):not(.assignee-initials) {
+    .ghost-card *:not(.assignee-chip):not(.assignee-initials):not(.avatar-fallback):not(.category-chip), 
+    .sortable-ghost *:not(.assignee-chip):not(.assignee-initials):not(.avatar-fallback):not(.category-chip) {
       visibility: hidden !important;
       opacity: 0 !important;
     }
@@ -129,6 +129,18 @@ export function addGlobalDragStyles() {
     .ghost-card .remove-button, 
     .sortable-ghost .remove-button {
       display: none !important;
+    }
+    
+    .ghost-card .category-chip, 
+    .sortable-ghost .category-chip {
+      visibility: visible !important;
+      opacity: 1 !important;
+    }
+    
+    .ghost-card .avatar-fallback, 
+    .sortable-ghost .avatar-fallback {
+      visibility: visible !important;
+      opacity: 1 !important;
     }
   `;
   document.head.appendChild(style);

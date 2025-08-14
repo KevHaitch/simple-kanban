@@ -4,13 +4,14 @@
     
     <div class="categories-list">
       <div 
-        v-for="category in categories" 
-        :key="category.id"
+        v-for="(category, index) in categories" 
+        :key="`category-${index}`"
         class="category-item"
       >
         <input
           v-model="category.name"
-          @input="updateCategory(category.id, 'name', $event.target.value)"
+          @input="updateCategory(category.id, 'name', $event.target.value, false)"
+          @blur="updateCategory(category.id, 'name', $event.target.value, true)"
           class="category-name-input"
           placeholder="Category name"
           :disabled="category.id === 'general'"
@@ -19,7 +20,7 @@
         <div class="color-picker-container">
           <input
             v-model="category.color"
-            @input="updateCategory(category.id, 'color', $event.target.value)"
+            @input="updateCategory(category.id, 'color', $event.target.value, false)"
             type="color"
             class="color-picker"
             :title="`Color for ${category.name}`"
@@ -158,13 +159,13 @@ export default {
     };
 
     // Update category property
-    const updateCategory = (categoryId, property, value) => {
+    const updateCategory = (categoryId, property, value, shouldUpdateId = true) => {
       const category = categories.value.find(cat => cat.id === categoryId);
       if (category) {
         category[property] = value;
         
-        // If changing name, potentially update ID (except for General)
-        if (property === 'name' && categoryId !== 'general') {
+        // If changing name, potentially update ID (except for General) - only when shouldUpdateId is true
+        if (property === 'name' && categoryId !== 'general' && shouldUpdateId) {
           const newId = generateCategoryId(value);
           if (newId !== categoryId) {
             category.id = newId;

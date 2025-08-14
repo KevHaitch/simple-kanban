@@ -38,6 +38,9 @@ export async function createTask(boardId, taskData, existingTasks = []) {
     status: taskData.status || 'backlog',
     category: taskData.category || 'General',
     createdAt: taskData.createdAt || new Date(),
+    createdBy: taskData.createdBy || null, // User ID who created the task
+    createdByEmail: taskData.createdByEmail || null, // User email who created the task
+    createdByName: taskData.createdByName || null, // User display name who created the task
     order: highestOrder + 1,
   };
   

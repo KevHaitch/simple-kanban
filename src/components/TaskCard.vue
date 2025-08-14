@@ -19,9 +19,9 @@
     
     <div class="task-footer">
       <div class="assignees-category-row">
-        <div v-if="task.assignees && task.assignees.length > 0" class="assignees-container">
+        <div class="assignees-container">
           <assignee-chip
-            v-for="email in task.assignees" 
+            v-for="email in (task.assignees || [])" 
             :key="email"
             :email="email"
             :projectId="boardId"
@@ -34,7 +34,7 @@
         <category-chip 
           :category="task.category || 'General'" 
           :clickable="false"
-          :board-categories="boardCategories"
+          :board-categories="boardCategories && boardCategories.length > 0 ? boardCategories : defaultCategories"
         />
       </div>
       
@@ -77,6 +77,16 @@ export default {
   setup(props) {
     const isDragging = ref(false);
     
+    const defaultCategories = [
+      { id: 'general', name: 'General', color: '#3b82f6' },
+      { id: 'bug', name: 'Bug', color: '#ef4444' },
+      { id: 'feature', name: 'Feature', color: '#10b981' },
+      { id: 'documentation', name: 'Documentation', color: '#f59e0b' },
+      { id: 'research', name: 'Research', color: '#8b5cf6' }
+    ];
+    
+
+    
     const onDragStart = (event) => {
       isDragging.value = true;
       event.dataTransfer.effectAllowed = 'move';
@@ -115,6 +125,7 @@ export default {
     
     return {
       isDragging,
+      defaultCategories,
       onDragStart,
       onDragEnd,
       truncateDescription,

@@ -5,7 +5,7 @@ import { ref, computed, watch } from 'vue';
 import { createTask, updateTask, deleteTask as removeTask, subscribeToTasks, reorderTasks, moveTask } from '../services/taskService';
 import { COLUMN_DEFINITIONS } from '../constants/taskStatuses';
 
-export function useTasks(selectedBoard) {
+export function useTasks(selectedBoard, user = null) {
   const tasks = ref([]);
   const selectedTask = ref(null);
   const isLoading = ref(false);
@@ -243,6 +243,9 @@ export function useTasks(selectedBoard) {
         status: 'backlog', // Always starts in backlog
         category: 'General', // Default category
         createdAt: new Date(),
+        createdBy: user.value?.uid || null,
+        createdByEmail: user.value?.email || null,
+        createdByName: user.value?.displayName || user.value?.email?.split('@')[0] || 'Unknown User',
       };
       
       const taskId = await createTask(selectedBoard.value.id, newTaskData, tasks.value);

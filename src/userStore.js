@@ -17,25 +17,36 @@ function init() {
       state.currentUser = user;
       
       // Store the current user's profile in Firestore
-      if (user.displayName) {
+      if (user.displayName || user.photoURL) {
         try {
-          await setDoc(doc(db, 'userDisplayNames', user.email), {
-            displayName: user.displayName,
-            firstName: getFirstNameFromDisplayName(user.displayName),
+          const profileData = {
             updatedAt: new Date()
-          }, { merge: true });
+          };
+          
+          if (user.displayName) {
+            profileData.displayName = user.displayName;
+            profileData.firstName = getFirstNameFromDisplayName(user.displayName);
+          }
+          
+          if (user.photoURL) {
+            profileData.photoURL = user.photoURL;
+          }
+          
+          await setDoc(doc(db, 'userDisplayNames', user.email), profileData, { merge: true });
         } catch (error) {
-          console.error('Error storing user display name:', error);
+          console.error('Error storing user profile:', error);
         }
       }
       
       // Cache the current user's profile
-      state.userProfiles[user.email] = {
+      const userProfile = {
         email: user.email,
         displayName: user.displayName,
         photoURL: user.photoURL,
         firstName: user.displayName ? getFirstNameFromDisplayName(user.displayName) : getFirstNameFromEmail(user.email),
       };
+      
+      state.userProfiles[user.email] = userProfile;
     } else {
       state.currentUser = null;
     }
@@ -61,6 +72,7 @@ async function getUserByEmail(email) {
         email,
         displayName: userData.displayName,
         firstName: userData.firstName || getFirstNameFromEmail(email),
+        photoURL: userData.photoURL || null,
       };
       
       return state.userProfiles[email];
@@ -74,6 +86,7 @@ async function getUserByEmail(email) {
     email,
     displayName: null,
     firstName: getFirstNameFromEmail(email),
+    photoURL: null,
   };
   
   // Cache it for future use

@@ -6,9 +6,6 @@
     @click="handleClick"
   >
     <span class="category-name">{{ categoryName }}</span>
-    <svg v-if="clickable" class="dropdown-icon" viewBox="0 0 20 20" fill="currentColor">
-      <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
-    </svg>
   </div>
 </template>
 
@@ -77,6 +74,7 @@ export default {
 </script>
 
 <style scoped>
+/* Standardized category chip - matches AssigneeChip design */
 .category-chip {
   display: flex;
   align-items: center;
@@ -84,35 +82,24 @@ export default {
   color: white;
   border-radius: 13px;
   padding: 0 10px;
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   font-weight: 600;
   white-space: nowrap;
-  gap: 4px;
   transition: all 0.2s ease;
+  margin-right: 4px;
+  margin-bottom: 4px;
 }
 
 .category-chip.clickable {
   cursor: pointer;
-  padding-right: 8px;
 }
 
 .category-chip.clickable:hover {
-  filter: brightness(0.85);
+  filter: brightness(1.1);
   transform: translateY(-1px);
 }
 
 .category-name {
   line-height: 1;
-}
-
-.dropdown-icon {
-  width: 12px;
-  height: 12px;
-  margin-left: 2px;
-  transition: transform 0.2s ease;
-}
-
-.category-chip.clickable:hover .dropdown-icon {
-  transform: translateY(1px);
 }
 </style>

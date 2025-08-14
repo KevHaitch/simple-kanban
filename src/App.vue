@@ -78,6 +78,8 @@
       v-if="selectedTask"
       :task="selectedTask"
       :boardId="selectedBoard?.id"
+      :board-collaborators="selectedBoard?.collaboratorDetails || []"
+      :board-categories="selectedBoard?.categories || []"
       @close="closeTaskModal"
       @save="saveTask"
       @delete="deleteTask"
@@ -141,7 +143,7 @@ export default {
     // Initialize all composables
     const auth = useAuth();
     const boards = useBoards(auth.user);
-    const tasks = useTasks(boards.selectedBoard);
+    const tasks = useTasks(boards.selectedBoard, auth.user);
     const search = useSearch(tasks.tasks);
     const modals = useModals();
 
