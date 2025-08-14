@@ -140,10 +140,7 @@ export default {
   background-color: #1a1a27;
   border-radius: 8px;
   padding: 1rem;
-  margin-top: 4px;
-  margin-bottom: 4px;
   cursor: pointer;
-  border: 1px solid #2d2d3a;
   transition: all 0.2s ease;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   display: flex;
@@ -223,29 +220,4 @@ export default {
   border: 1px solid rgba(34, 197, 94, 0.2);
 }
 
-/* Status-specific styling */
-.status-backlog {
-  border-left: none;
-}
-
-.status-ready {
-  border-left: none;
-}
-
-.status-in-progress {
-  border-left: none;
-}
-
-.status-review {
-  border-left: none;
-}
-
-.status-qa {
-  border-left: none;
-}
-
-.status-done {
-  border-left: none;
-  opacity: 0.7;
-}
 </style> 

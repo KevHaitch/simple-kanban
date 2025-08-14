@@ -3,7 +3,17 @@
     <Menu as="div" class="relative inline-block text-left">
       <div>
         <MenuButton class="user-btn">
-          {{ user.displayName || 'User' }}
+          <img 
+            v-if="user.photoURL" 
+            :src="user.photoURL" 
+            :alt="user.displayName || user.email"
+            class="user-avatar"
+            @error="onAvatarError"
+          />
+          <div v-else class="user-avatar-fallback">
+            {{ getUserInitials() }}
+          </div>
+          <span v-if="getShortName()" class="user-name">{{ getShortName() }}</span>
         </MenuButton>
       </div>
 
@@ -51,7 +61,7 @@
           
           <MenuItem v-slot="{ active }">
             <a 
-              @click="$emit('new-project')"
+              @click.prevent="handleNewProject"
               :class="[
                 active ? 'menu-item-active' : '',
                 'dropdown-item'
@@ -65,7 +75,7 @@
           </MenuItem>
           <MenuItem v-if="selectedBoard" v-slot="{ active }">
             <a 
-              @click="$emit('edit-project', selectedBoard)"
+              @click.prevent="handleEditProject"
               :class="[
                 active ? 'menu-item-active' : '',
                 'dropdown-item'
@@ -79,7 +89,7 @@
           </MenuItem>
           <MenuItem v-slot="{ active }">
             <a 
-              @click="$emit('sign-out')"
+              @click.prevent="handleSignOut"
               :class="[
                 active ? 'menu-item-active' : '',
                 'dropdown-item'
@@ -121,6 +131,41 @@ export default {
     selectBoard(board) {
       this.$emit('select-board', board);
     },
+    onAvatarError() {
+      // Avatar failed to load, will show fallback
+    },
+    getUserInitials() {
+      if (this.user.displayName) {
+        return this.user.displayName
+          .split(' ')
+          .map(name => name.charAt(0))
+          .join('')
+          .toUpperCase()
+          .substring(0, 2);
+      }
+      if (this.user.email) {
+        return this.user.email.charAt(0).toUpperCase();
+      }
+      return 'U';
+    },
+    getShortName() {
+      if (this.user.displayName) {
+        return this.user.displayName.split(' ')[0];
+      }
+      if (this.user.email) {
+        return this.user.email.split('@')[0];
+      }
+      return '';
+    },
+    handleNewProject() {
+      this.$emit('new-project');
+    },
+    handleEditProject() {
+      this.$emit('edit-project', this.selectedBoard);
+    },
+    handleSignOut() {
+      this.$emit('sign-out');
+    },
   },
 };
 </script>
@@ -132,32 +177,61 @@ export default {
   position: relative;
   display: inline-block;
   font-family: 'Poppins', sans-serif;
+  height: 40px;
 }
 
 .user-btn {
-  padding: 10px 18px;
-  background: #1e1e2d;
-  color: #e6e6e9;
-  border: 1px solid #2d2d3a;
-  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  background-color: #252535;
+  border: 3px solid #2d2d3a;
+  border-radius: 20px;
+  height: 40px;
   cursor: pointer;
-  font-family: 'Poppins', sans-serif;
-  font-weight: 500;
   transition: all 0.2s ease;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-  letter-spacing: 0.3px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  white-space: nowrap;
 }
 
 .user-btn:hover {
-  background: #252535;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  background-color: #2a2a3e;
+  border-color: #3a3a4e;
 }
 
 .user-btn:focus {
   outline: none;
-  box-shadow: 0 0 0 3px rgba(86, 77, 182, 0.25);
 }
+
+.user-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.user-avatar-fallback {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background-color: #6366f1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6c6c84;
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.user-name {
+  color: #6c6c84;
+  font-size: 0.95rem;
+  font-weight: 500;
+  padding: 0 12px;
+}
+
+
 
 .dropdown-menu {
   position: absolute;

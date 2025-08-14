@@ -67,9 +67,15 @@ export default {
   height: 100%;
   display: flex;
   flex-direction: column;
-  background-color: #252531;
+  background: rgba(255, 255, 255, 0.02);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: 
+    0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
   box-shadow: -4px 0 20px rgba(0, 0, 0, 0.3);
-  border-left: 1px solid #2d2d3a;
+  border-left: 1px solid #18181c;
 }
 
 .sidesheet-header {
@@ -77,17 +83,7 @@ export default {
   justify-content: space-between;
   align-items: center;
   padding: 1.25rem 1.5rem;
-  background-color: #1a1a27;
-  border-bottom: 1px solid #2d2d3a;
   flex-shrink: 0;
-}
-
-.sidesheet-header h2 {
-  font-size: 1.25rem;
-  font-weight: 600;
-  color: #e6e6e9;
-  margin: 0;
-  font-family: 'Poppins', sans-serif;
 }
 
 .close-btn {
@@ -118,7 +114,7 @@ export default {
   overflow-y: auto;
   padding: 1rem;
   scrollbar-width: thin;
-  scrollbar-color: #3b3b4a #252531;
+  scrollbar-color: #3b3b4a rgba(255, 255, 255, 0.025);
 }
 
 .sidesheet-content::-webkit-scrollbar {
@@ -126,7 +122,7 @@ export default {
 }
 
 .sidesheet-content::-webkit-scrollbar-track {
-  background: #252531;
+  background: rgba(255, 255, 255, 0.025);
   border-radius: 3px;
 }
 
@@ -138,7 +134,7 @@ export default {
 .tasks-container {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 8px;
 }
 
 .empty-state {

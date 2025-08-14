@@ -1,58 +1,19 @@
 <template>
   <div id="app">
     <div v-if="user">
-      <div class="header">
-        <div class="header-title" :class="{ 'can-edit': canEditProject }">
-          <img src="./assets/kaiborg_logo.png" alt="Kaiborg Logo" class="logo" />
-          <h1 @click="canEditProject && openProjectModal(selectedBoard)">
-            {{ selectedBoard ? selectedBoard.name : 'Kaiborg' }}
-            <svg v-if="canEditProject" xmlns="http://www.w3.org/2000/svg" class="settings-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-          </h1>
-        </div>
-        <div class="header-actions">
-          <div class="search-container">
-            <form @submit.prevent="performSearch" class="search-form">
-              <input
-                v-model="searchQuery"
-                type="text"
-                placeholder="Search tasks, @username, or combine both..."
-                class="search-input"
-                @keyup.enter="performSearch"
-              />
-              <button type="submit" class="search-btn" :disabled="!searchQuery.trim()">
-                <svg xmlns="http://www.w3.org/2000/svg" class="search-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-              </button>
-            </form>
-          </div>
-          <button v-if="selectedBoard" @click="handleNewTask" class="action-btn">
-            Add Task
-            <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 20 20" fill="currentColor">
-              <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" />
-            </svg>
-          </button>
-          <button v-if="selectedBoard" @click="toggleChangelog" class="action-btn">
-            Changelog
-            <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 20 20" fill="currentColor">
-              <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
-            </svg>
-          </button>
-        </div>
-        <user-dropdown
-          :user="user"
-          :boards="boards"
-          :selectedBoardId="selectedBoard?.id"
-          :selectedBoard="selectedBoard"
-          @select-board="selectBoard"
-          @new-project="openNewProjectModal"
-          @edit-project="openProjectModal"
-          @sign-out="signOut"
-        />
-      </div>
+      <app-header
+        :user="user"
+        :selected-board="selectedBoard"
+        :boards="boards"
+        v-model:search-query="searchQuery"
+        @select-board="selectBoard"
+        @new-project="openNewProjectModal"
+        @edit-project="openProjectModal"
+        @sign-out="signOut"
+        @new-task="handleNewTask"
+        @toggle-changelog="toggleChangelog"
+        @search="performSearch"
+      />
       <div v-if="selectedBoard">
         <div class="columns">
           <draggable-column 
@@ -112,6 +73,7 @@
 
 <script>
 import { onBeforeUnmount } from 'vue';
+import AppHeader from './components/AppHeader.vue';
 import TaskModal from './components/TaskModal.vue';
 import UserDropdown from './components/UserDropdown.vue';
 import ProjectModal from './components/ProjectModal.vue';
@@ -130,6 +92,7 @@ import { getRandomEmptyMessage } from './constants/messages';
 export default {
   name: 'App',
   components: { 
+    AppHeader,
     TaskModal, 
     UserDropdown, 
     ProjectModal, 
@@ -162,7 +125,6 @@ export default {
       // Boards
       boards: boards.boards,
       selectedBoard: boards.selectedBoard,
-      canEditProject: boards.canEditCurrentBoard,
       selectBoard: boards.selectBoard,
       createProject: boards.createNewBoard,
       updateProject: boards.updateExistingBoard,
@@ -216,7 +178,7 @@ export default {
 
 #app {
   min-height: 100vh;
-  background-color: #252531;
+  background-color: #000;
   color: #D1D5DB;
   font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -225,174 +187,15 @@ export default {
   flex-direction: column;
 }
 
-.header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background-color: #1a1a27;
-  padding: 0.75rem 1rem;
-  border-bottom: 1px solid #2d2d3a;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  position: sticky;
-  top: 0;
-  z-index: 30;
-}
 
-.header-title {
-  display: flex;
-  align-items: center;
-  flex: 1;
-}
-
-.header-title.can-edit h1 {
-  cursor: pointer;
-  transition: color 0.2s ease;
-}
-
-.header-title.can-edit h1:hover {
-  color: #6366f1;
-}
-
-.logo {
-  width: 45px;
-  height: 45px;
-  margin-right: 12px;
-  border-radius: 6px;
-}
-
-.header-title h1 {
-  margin: 0;
-  font-size: 1.875rem;
-  font-weight: 600;
-  color: #f9fafb;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  line-height: 1.2;
-}
-
-.settings-icon {
-  width: 20px;
-  height: 20px;
-  color: #9CA3AF;
-  transition: color 0.2s ease;
-}
-
-.header-title.can-edit h1:hover .settings-icon {
-  color: #6366f1;
-}
-
-.header-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  flex: 1;
-  justify-content: center;
-}
-
-.search-container {
-  flex: 1;
-  max-width: 400px;
-}
-
-.search-form {
-  display: flex;
-  align-items: center;
-  background-color: #2d2d3a;
-  border: 1px solid #3a3a47;
-  border-radius: 8px;
-  overflow: hidden;
-  transition: border-color 0.2s ease;
-}
-
-.search-form:focus-within {
-  border-color: #6366f1;
-}
-
-.search-input {
-  flex: 1;
-  background: transparent;
-  border: none;
-  padding: 0.75rem 1rem;
-  color: #f9fafb;
-  font-size: 0.875rem;
-  outline: none;
-}
-
-.search-input::placeholder {
-  color: #9CA3AF;
-}
-
-.search-btn {
-  padding: 0.75rem;
-  background: transparent;
-  border: none;
-  color: #9CA3AF;
-  cursor: pointer;
-  transition: color 0.2s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.search-btn:hover:not(:disabled) {
-  color: #6366f1;
-}
-
-.search-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.search-icon {
-  width: 18px;
-  height: 18px;
-}
-
-.action-btn {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  background-color: #1e1e2e;
-  color: #a1a1b5;
-  border: 1px solid #2d2d3a;
-  padding: 0.625rem 1rem;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  font-size: 0.875rem;
-  font-weight: 500;
-  white-space: nowrap;
-  min-height: 38px;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-  letter-spacing: 0.3px;
-}
-
-.action-btn:hover {
-  background: #252535;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
-}
-
-.action-btn:focus {
-  outline: none;
-  box-shadow: 0 0 0 3px rgba(86, 77, 182, 0.25);
-}
-
-.icon {
-  width: 18px;
-  height: 18px;
-  margin-left: 8px;
-}
 
 .columns {
   display: flex;
   justify-content: space-between;
-  padding: 1rem 1rem;
-  gap: 0.5rem;
-  background-color: #252531;
+  padding: 1.5rem 1.5rem;
+  gap: 0.125rem;
   flex: 1;
-  height: calc(100vh - 95px); /* Increased subtraction to prevent window scrollbar */
+  height: calc(100vh - 80px);
   overflow: hidden; /* Prevent container scrolling */
 }
 

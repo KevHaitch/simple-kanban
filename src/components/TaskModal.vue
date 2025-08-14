@@ -608,7 +608,6 @@ export default {
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2);
   color: #e6e6e9;
   font-family: 'Poppins', sans-serif;
-  border: 1px solid #2d2d3a;
   overflow: hidden;
 }
 
@@ -792,6 +791,7 @@ label {
   display: block;
   line-height: 1.5;
   box-sizing: border-box;
+  min-height: 240px;
 }
 
 .description-input:focus {

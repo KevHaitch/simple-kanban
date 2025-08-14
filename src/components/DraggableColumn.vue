@@ -1,4 +1,5 @@
 <template>
+  
   <div class="column">
     <h3>{{ column.name }} ({{ column.tasks.length }})</h3>
     <div class="task-list">
@@ -193,15 +194,7 @@ export default {
 <style scoped>
 .column {
   width: 19%;
-  background-color: #252531; /* Same as parent background */
   color: #e6e6e9;
-  border-radius: 8px;
-  padding: 0.25rem;
-  box-shadow: inset 2px 2px 5px #1c1c25, 
-              inset -2px -2px 5px #30303e,
-              2px 0 3px -2px #1c1c25,
-              -2px 0 3px -2px #30303e;
-  border: none;
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -211,12 +204,12 @@ export default {
 .column h3 {
   font-size: 1rem;
   line-height: 1.5rem;
-  color: #e6e6e9;
+  color: #6c6c84;
   text-align: left;
   font-weight: 600;
   letter-spacing: 0.5px;
   flex-shrink: 0;
-  padding: 1rem;
+  margin: 0.5rem 1.5rem;
 }
 
 .task-list {
@@ -226,9 +219,18 @@ export default {
   overflow-y: auto; /* Only scroll when needed */
   overflow-x: hidden; /* No horizontal scroll */
   flex-grow: 1;
-  /* Scrollbar styling */
+  padding: 0 8px;
   scrollbar-width: thin;
-  scrollbar-color: #3b3b4a #252531;
+  scrollbar-color: #3b3b4a rgba(255, 255, 255, 0.025);
+  border-radius:4px;
+  /* Subtle glass panel effect */
+  background: rgba(255, 255, 255, 0.02);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: 
+    0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
 /* Scrollbar styling for Webkit browsers */
@@ -237,7 +239,7 @@ export default {
 }
 
 .task-list::-webkit-scrollbar-track {
-  background: #252531;
+  background: rgba(255, 255, 255, 0.025);
   border-radius: 3px;
 }
 
@@ -248,6 +250,10 @@ export default {
 
 .draggable-container {
   min-height: 10px; /* Ensure the container is always visible */
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 0;
 }
 
 .empty-column {
@@ -258,8 +264,6 @@ export default {
   text-align: center;
   color: #6c6c84;
   font-size: 0.9rem;
-  margin: 0.5rem;
-  margin-top: 0;
   border: 1px dashed #3b3b4a;
   border-radius: 6px;
   background-color: rgba(30, 30, 45, 0.3);
@@ -272,7 +276,6 @@ export default {
   display: flex;
   align-items: center;
   width: 100%;
-  padding: 0 0.25rem;
 }
 
 .draggable-task-card {
