@@ -159,6 +159,10 @@ export function useTasks(selectedBoard, user = null) {
         assignees: task.assignees || [],
         status: task.status,
         category: task.category || 'General',
+        // Persist normalized category fields when present
+        ...(task.categoryId !== undefined ? { categoryId: task.categoryId || null } : {}),
+        ...(task.categoryName !== undefined ? { categoryName: task.categoryName || 'General' } : {}),
+        ...(task.categoryColor !== undefined ? { categoryColor: task.categoryColor || '#3b82f6' } : {}),
         createdAt: task.createdAt
       };
 
@@ -259,7 +263,7 @@ export function useTasks(selectedBoard, user = null) {
         // Compute category-specific indexes
         const byCategory = new Map();
         tasksWithOrder = tasksWithOrder.map((task) => {
-          const cat = (task.category || 'General');
+          const cat = (task.categoryId || task.category || 'General');
           const next = byCategory.get(cat) ?? 0;
           byCategory.set(cat, next + 1);
           return { ...task, categoryOrder: next };

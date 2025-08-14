@@ -9,6 +9,7 @@
         @select-board="selectBoard"
         @new-project="openNewProjectModal"
         @edit-project="openProjectModal"
+        @edit-categories="openCategoriesModal"
         @sign-out="signOut"
         @new-task="handleNewTask"
         @toggle-changelog="toggleChangelog"
@@ -56,6 +57,13 @@
       @create="createProject"
       @update="updateProject"
     />
+    <categories-modal
+      v-if="showCategoriesModal"
+      :is-open="showCategoriesModal"
+      :project="projectForCategories"
+      @updated="(cats) => { if (selectedBoard) selectedBoard.categories = cats }"
+      @close="closeCategoriesModal"
+    />
     <changelog-sidesheet
       v-if="showChangelog"
       :done-tasks="doneTasks"
@@ -76,11 +84,12 @@
 </template>
 
 <script>
-import { onBeforeUnmount } from 'vue';
+import { ref, onBeforeUnmount } from 'vue';
 import AppHeader from './components/AppHeader.vue';
 import TaskModal from './components/TaskModal.vue';
 import UserDropdown from './components/UserDropdown.vue';
 import ProjectModal from './components/ProjectModal.vue';
+import CategoriesModal from './components/CategoriesModal.vue';
 import ChangelogSidesheet from './components/ChangelogSidesheet.vue';
 import LandingPage from './components/LandingPage.vue';
 import DraggableColumn from './components/DraggableColumn.vue';
@@ -100,6 +109,7 @@ export default {
     TaskModal, 
     UserDropdown, 
     ProjectModal, 
+    CategoriesModal,
     ChangelogSidesheet, 
     LandingPage,
     DraggableColumn,
@@ -126,6 +136,15 @@ export default {
     }
 
     // Removed backfill console exposure for security
+
+    const showCategoriesModal = ref(false);
+    const projectForCategories = ref(null);
+
+    function openCategoriesModal(project) {
+      projectForCategories.value = project || boards.selectedBoard.value;
+      showCategoriesModal.value = true;
+    }
+    function closeCategoriesModal() { showCategoriesModal.value = false; }
 
     return {
       // Auth
@@ -179,6 +198,10 @@ export default {
       closeProjectModal: modals.closeProjectModal,
       openNewProjectModal: modals.openNewProjectModal,
       toggleChangelog: modals.toggleChangelog,
+      showCategoriesModal,
+      projectForCategories,
+      openCategoriesModal,
+      closeCategoriesModal,
       
       // Utilities
       getRandomEmptyMessage

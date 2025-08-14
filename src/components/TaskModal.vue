@@ -526,7 +526,9 @@ export default {
       if (match) {
         selectCategory(match);
       } else {
-        selectCategory(val || 'General');
+        // Unknown or removed category -> default to General
+        const general = (props.boardCategories || []).find(c => String(c.name || '').toLowerCase() === 'general') || { id: 'general', name: 'General', color: '#3b82f6' };
+        selectCategory(general);
       }
       showCategoryDropdown.value = false;
     };

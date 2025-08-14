@@ -199,6 +199,7 @@ export default {
           newOrder: newIndex
         });
       }
+      // Reorders within the same column are handled by columnTasks setter (emits tasksReordered)
       
       // Handle removed task (moved to another column)
       // We don't need to handle this as the receiving column will emit taskMoved

@@ -42,6 +42,7 @@
         @select-board="$emit('select-board', $event)"
         @new-project="$emit('new-project')"
         @edit-project="$emit('edit-project', $event)"
+        @edit-categories="$emit('edit-categories', $event)"
         @sign-out="$emit('sign-out')"
       />
     </div>
@@ -79,6 +80,7 @@ export default {
     'select-board',
     'new-project', 
     'edit-project',
+    'edit-categories',
     'sign-out',
     'new-task',
     'toggle-changelog',
@@ -157,9 +159,7 @@ export default {
 }
 
 /* Search Form Specific Styles */
-.search-container {
 
-}
 
 .search-form {
   display: flex;
