@@ -1,7 +1,22 @@
 <template>
   
   <div class="column">
-    <h3>{{ column.name }} ({{ column.tasks.length }})</h3>
+    <div class="column-header">
+      <template v-if="column.id === 'backlog'">
+        <div class="category-header">
+          <CategorySelect
+            :categories="boardCategories"
+            :counts="countsById"
+            v-model="selectedCategoryProxy"
+            variant="header"
+            :align-left-padding="'1.5rem'"
+          />
+        </div>
+      </template>
+      <template v-else>
+        <h3>{{ column.name }} ({{ column.tasks.length }})</h3>
+      </template>
+    </div>
     <div class="task-list">
       <draggable 
         v-model="columnTasks" 
@@ -46,17 +61,27 @@ import { computed, toRefs, ref, onMounted } from 'vue';
 import draggable from 'vuedraggable';
 import TaskCard from './TaskCard.vue';
 import { styleGhostElements, resetTaskStyling, addGlobalDragStyles } from '../utils/dragUtils';
+import CategorySelect from './CategorySelect.vue';
 
 export default {
   name: 'DraggableColumn',
   components: {
     draggable,
-    TaskCard
+    TaskCard,
+    CategorySelect
   },
   props: {
     column: {
       type: Object,
       required: true
+    },
+    selectedBacklogCategory: {
+      type: String,
+      default: 'General'
+    },
+    backlogCategoryCounts: {
+      type: Object,
+      default: () => ({})
     },
     boardId: {
       type: String,
@@ -75,9 +100,9 @@ export default {
       default: () => []
     }
   },
-  emits: ['openTask', 'taskMoved', 'tasksReordered'],
+  emits: ['openTask', 'taskMoved', 'tasksReordered', 'updateBacklogCategory'],
   setup(props, { emit }) {
-    const { column } = toRefs(props);
+    const { column, selectedBacklogCategory } = toRefs(props);
     const isDraggingOver = ref(false);
     const isDragging = ref(false);
     
@@ -179,13 +204,59 @@ export default {
       // We don't need to handle this as the receiving column will emit taskMoved
     };
     
+    const selectedCategoryProxy = computed({
+      get: () => selectedBacklogCategory.value,
+      set: (val) => emit('updateBacklogCategory', val || 'General')
+    });
+
+    // Map counts keyed by id to names so CategorySelect header label works per option
+    const countsById = computed(() => {
+      const out = {};
+      const counts = props.backlogCategoryCounts || {};
+      const cats = props.boardCategories || [];
+      cats.forEach(c => { out[c.name] = counts[c.id] || 0; });
+      // Ensure General present
+      if ('general' in counts && !('General' in out)) out['General'] = counts['general'];
+      return out;
+    });
+
+    // Build select options from provided counts and board categories order
+    const categoryOptions = computed(() => {
+      const counts = props.backlogCategoryCounts || {};
+      const boardCats = Array.isArray(props.boardCategories) ? props.boardCategories.map(c => c.name) : [];
+      const set = new Set();
+      const opts = [];
+      if (counts.General !== undefined) {
+        opts.push({ name: 'General', count: counts.General });
+        set.add('general');
+      }
+      boardCats.forEach((n) => {
+        const key = String(n || '').trim().toLowerCase();
+        if (set.has(key)) return;
+        opts.push({ name: n, count: counts[n] || 0 });
+        set.add(key);
+      });
+      Object.keys(counts).forEach((n) => {
+        const key = String(n || '').trim().toLowerCase();
+        if (set.has(key)) return;
+        opts.push({ name: n, count: counts[n] || 0 });
+        set.add(key);
+      });
+      return opts;
+    });
+
     return {
       columnTasks,
       onDragEnd,
       onChange,
       onMove,
       onDragStart,
-      isDraggingOver
+      isDraggingOver,
+      selectedBacklogCategory,
+      selectedCategoryProxy,
+      categoryOptions,
+      backlogCategoryCounts: props.backlogCategoryCounts,
+      countsById
     };
   }
 };
@@ -201,6 +272,12 @@ export default {
   overflow: hidden; /* Ensure no column overflow */
 }
 
+.column-header {
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+}
+
 .column h3 {
   font-size: 1rem;
   line-height: 1.5rem;
@@ -210,6 +287,79 @@ export default {
   letter-spacing: 0.5px;
   flex-shrink: 0;
   margin: 0.5rem 1.5rem;
+}
+
+.category-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 1.5rem;
+  position: relative; /* Anchor menu positioning */
+}
+
+.category-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.category-title {
+  font-size: 1rem;
+  line-height: 1.5rem;
+  color: #6c6c84;
+  font-weight: 600;
+  transition: color 0.15s ease;
+}
+
+.category-button:hover .category-title {
+  color: #e6e6e9;
+}
+
+.category-caret {
+  width: 16px;
+  height: 16px;
+  color: #6c6c84;
+  transition: transform 0.2s ease, color 0.15s ease;
+}
+
+.category-button:hover .category-caret {
+  color: #e6e6e9;
+}
+
+.category-caret.open {
+  transform: rotate(180deg);
+}
+
+.category-menu {
+  position: absolute;
+  top: calc(100% + 6px); /* sits just below the header/button */
+  /* align option text left edge with header text by subtracting menu + item padding */
+  left: calc(1.5rem - (6px + 10px));
+  min-width: 220px;
+  background: #111217;
+  border: 1px solid #18181c;
+  border-radius: 8px;
+  box-shadow: 0 10px 20px rgba(0,0,0,0.4);
+  padding: 6px;
+  z-index: 10;
+}
+
+.category-menu-item {
+  padding: 8px 10px;
+  color: #6c6c84;
+  font-weight: 600;
+  font-size: 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.category-menu-item:hover {
+  background: rgba(255,255,255,0.06);
+  color: #e6e6e9;
 }
 
 .task-list {

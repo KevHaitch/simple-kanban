@@ -1,9 +1,10 @@
 <template>
-  <Dialog :open="true" @close="handleClose" class="relative z-50">
+  <Dialog :open="true" :initialFocus="dialogInitialFocus" @close="handleClose" class="relative z-50">
     <div class="fixed inset-0 bg-black/50 backdrop-blur-sm" aria-hidden="true" />
     
     <div class="fixed inset-0 flex items-center justify-center p-4">
       <DialogPanel class="modal-content">
+        <button ref="noFocusRef" class="sr-only" tabindex="0" aria-hidden="true"></button>
         <div class="status-title-row">
           <div class="title-container">
             <textarea
@@ -112,26 +113,13 @@
           </div>
           
           <div v-if="showCategoryDropdown" class="category-popover">
-            <div class="category-chips-grid">
-              <div 
-                v-for="category in availableCategories" 
-                :key="category.id"
-                @click.stop="selectCategory(category)"
-                class="category-chip-item"
-                :class="{ 'selected': localTask.category === category.id || localTask.category === category.name }"
-                :style="{ backgroundColor: category.color }"
-              >
-                <span class="category-chip-name">{{ category.name }}</span>
-                <div 
-                  v-if="localTask.category === category.id || localTask.category === category.name"
-                  class="category-check"
-                >
-                  <svg class="check-icon" viewBox="0 0 20 20" fill="currentColor">
-                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
-                  </svg>
-                </div>
-              </div>
-            </div>
+            <CategorySelect
+              :categories="availableCategories"
+              v-model="localTask.category"
+              variant="grid"
+              :prefer-id="true"
+              @change="onCategoryChange"
+            />
           </div>
         </div>
         
@@ -183,6 +171,7 @@ import { db, auth } from '../firebase';
 import debounce from 'lodash/debounce';
 import AssigneeChip from './AssigneeChip.vue';
 import CategoryChip from './CategoryChip.vue';
+import CategorySelect from './CategorySelect.vue';
 import userStore from '../userStore';
 
 export default {
@@ -193,7 +182,8 @@ export default {
     DialogTitle,
     TrashIcon,
     AssigneeChip,
-    CategoryChip
+    CategoryChip,
+    CategorySelect
   },
   props: ['task', 'boardId', 'boardCollaborators', 'boardCategories'],
   emits: ['close', 'save', 'delete'],
@@ -230,6 +220,12 @@ export default {
     const projectOwnerEmail = ref('');
     const projectCollaborators = ref(props.boardCollaborators || []);
     const titleTextarea = ref(null);
+    const noFocusRef = ref(null);
+    const dialogInitialFocus = computed(() => {
+      // Disable autofocus by default; only opt-in if truly empty title
+      const isEmpty = (localTask.value?.title || '').trim() === '';
+      return isEmpty ? titleTextarea : noFocusRef;
+    });
     const descriptionTextarea = ref(null);
     const isInitialLoad = ref(true);
     const lastSavedTask = ref(JSON.stringify({
@@ -259,10 +255,7 @@ export default {
           if (titleTextarea.value) adjustTextareaHeight(titleTextarea.value);
           if (descriptionTextarea.value) adjustTextareaHeight(descriptionTextarea.value);
           
-          // Auto-focus title field when title is empty
-          if (localTask.value.title.trim() === "") {
-            titleTextarea.value?.focus();
-          }
+          // Auto-focus title field when title is empty (handled by initialFocus binding)
         });
       }
     }, { immediate: true });
@@ -319,15 +312,7 @@ export default {
       adjustTextareaHeight(titleTextarea.value);
       adjustTextareaHeight(descriptionTextarea.value);
       
-      // Auto-focus title field when title is empty
-      if (localTask.value.title.trim() === "") {
-        nextTick(() => {
-          if (titleTextarea.value) {
-            titleTextarea.value.focus();
-            titleTextarea.value.select(); // Select placeholder text if any
-          }
-        });
-      }
+       // Autofocus handled via initialFocus; no manual focusing here
     });
 
     onBeforeUnmount(() => {
@@ -516,10 +501,34 @@ export default {
     };
 
     const selectCategory = (category) => {
-      // Store the category ID for consistency with database
-      localTask.value.category = typeof category === 'object' ? category.id : category;
+      // Store normalized fields: id + snapshot
+      if (typeof category === 'object' && category !== null) {
+        localTask.value.categoryId = category.id || null;
+        localTask.value.categoryName = category.name || 'General';
+        localTask.value.categoryColor = category.color || '#3b82f6';
+        localTask.value.category = category.name || 'General'; // legacy field
+      } else {
+        localTask.value.categoryId = null;
+        localTask.value.categoryName = String(category || 'General');
+        localTask.value.categoryColor = '#3b82f6';
+        localTask.value.category = String(category || 'General');
+      }
       showCategoryDropdown.value = false;
       forceSave();
+    };
+
+    const onCategoryChange = (val) => {
+      // val can be id or name depending on selector; map to full category from board
+      const match = (props.boardCategories || []).find(
+        (c) => String(c.id || '').toLowerCase() === String(val || '').toLowerCase() ||
+               String(c.name || '').toLowerCase() === String(val || '').toLowerCase()
+      );
+      if (match) {
+        selectCategory(match);
+      } else {
+        selectCategory(val || 'General');
+      }
+      showCategoryDropdown.value = false;
     };
 
     const toggleStatusDropdown = () => {
@@ -584,6 +593,7 @@ export default {
       toggleAssigneeDropdown,
       toggleCategoryDropdown,
       selectCategory,
+      onCategoryChange,
       toggleStatusDropdown,
       selectStatus,
       getStatusDisplayName,

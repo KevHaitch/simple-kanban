@@ -10,13 +10,14 @@
         </button>
       </div>
       <div class="sidesheet-content">
-        <div v-if="doneTasks.length" class="tasks-container">
-          <task-card 
-            v-for="task in doneTasks" 
-            :key="task.id" 
-            :task="task" 
-            @click="$emit('open-task', task)"
-          />
+         <div v-if="doneTasks.length" class="tasks-container">
+           <task-card 
+             v-for="task in normalizedDoneTasks" 
+             :key="task.id" 
+             :task="task" 
+             :board-categories="normalizedBoardCategories"
+             @click="$emit('open-task', task)"
+           />
         </div>
         <div v-else class="empty-state">
           <svg xmlns="http://www.w3.org/2000/svg" class="empty-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -41,6 +42,23 @@ export default {
     doneTasks: {
       type: Array,
       default: () => []
+    },
+    boardCategories: {
+      type: Array,
+      default: () => []
+    }
+  },
+  computed: {
+    normalizedBoardCategories() {
+      // Prefer board-defined categories, but ensure General exists
+      const list = Array.isArray(this.boardCategories) ? this.boardCategories : [];
+      const hasGeneral = list.some((c) => (c.name || '').trim().toLowerCase() === 'general');
+      if (hasGeneral) return list;
+      return [{ id: 'general', name: 'General', color: '#3b82f6' }, ...list];
+    },
+    normalizedDoneTasks() {
+      // Pass through tasks unchanged; CategoryChip will map names via normalizedBoardCategories
+      return this.doneTasks;
     }
   }
 };
@@ -53,7 +71,7 @@ export default {
   right: 0;
   bottom: 0;
   left: 0;
-  z-index: 20;
+  z-index: 200; /* Above AppHeader (z-index: 100) so clicks hit overlay */
   background-color: rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(4px);
 }

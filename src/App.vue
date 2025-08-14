@@ -20,13 +20,16 @@
             v-for="col in computedColumns" 
             :key="col.id"
             :column="col"
+            :selected-backlog-category="selectedBacklogCategory"
+            :backlog-category-counts="backlogCategoryCounts"
             :boardId="selectedBoard.id"
             :emptyMessage="getRandomEmptyMessage()"
-            :board-collaborators="(() => { console.log('Board collaboratorDetails:', selectedBoard.collaboratorDetails); return selectedBoard.collaboratorDetails || []; })()"
-            :board-categories="(() => { console.log('Board categories:', selectedBoard.categories); return selectedBoard.categories || []; })()"
+            :board-collaborators="selectedBoard.collaboratorDetails || []"
+            :board-categories="selectedBoard.categories || []"
             @open-task="openTaskModal"
             @task-moved="handleTaskMoved"
             @tasks-reordered="handleTasksReordered"
+            @updateBacklogCategory="setBacklogCategory"
           />
         </div>
       </div>
@@ -56,6 +59,7 @@
     <changelog-sidesheet
       v-if="showChangelog"
       :done-tasks="doneTasks"
+      :board-categories="selectedBoard?.categories || []"
       @close="showChangelog = false"
       @open-task="openTaskModal"
     />
@@ -116,6 +120,13 @@ export default {
       tasks.cleanup();
     });
 
+    function setBacklogCategory(val) {
+      // Ensure we update the ref's value, not reassign the ref
+      tasks.selectedBacklogCategory.value = val;
+    }
+
+    // Removed backfill console exposure for security
+
     return {
       // Auth
       user: auth.user,
@@ -134,6 +145,9 @@ export default {
       selectedTask: tasks.selectedTask,
       computedColumns: tasks.computedColumns,
       doneTasks: tasks.doneTasks,
+      backlogCategoryCounts: tasks.backlogCategoryCounts,
+      selectedBacklogCategory: tasks.selectedBacklogCategory,
+      setBacklogCategory,
       openTaskModal: tasks.openTaskModal,
       openNewTaskModal: tasks.openNewTaskModal,
       handleNewTask: async () => {

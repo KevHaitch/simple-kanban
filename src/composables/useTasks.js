@@ -3,6 +3,7 @@
  */
 import { ref, computed, watch } from 'vue';
 import { createTask, updateTask, deleteTask as removeTask, subscribeToTasks, reorderTasks, moveTask } from '../services/taskService';
+import { buildCategoryCounts, normalizeCategories } from './useCategories';
 import { COLUMN_DEFINITIONS } from '../constants/taskStatuses';
 
 export function useTasks(selectedBoard, user = null) {
@@ -10,6 +11,8 @@ export function useTasks(selectedBoard, user = null) {
   const selectedTask = ref(null);
   const isLoading = ref(false);
   const error = ref(null);
+  // Selected category for the backlog column; defaults to General
+  const selectedBacklogCategory = ref('General');
 
   // Unsubscribe function
   let unsubscribeTasks = null;
@@ -18,10 +21,32 @@ export function useTasks(selectedBoard, user = null) {
    * Get tasks organized by columns
    */
   const computedColumns = computed(() => {
-    return COLUMN_DEFINITIONS.map((col) => ({
-      ...col,
-      tasks: tasks.value.filter((task) => task.status === col.id) || [],
-    }));
+    return COLUMN_DEFINITIONS.map((col) => {
+      if (col.id === 'backlog') {
+        const categoryName = (selectedBacklogCategory.value || 'General').trim().toLowerCase();
+        const boardCats = selectedBoard.value?.categories || [];
+        const normalizedBoard = normalizeCategories(boardCats);
+        const selectedCat = normalizedBoard.find((c) => String(c.name || '').trim().toLowerCase() === categoryName);
+        const selectedId = (selectedCat ? String(selectedCat.id || '').trim().toLowerCase() : 'general');
+        return {
+          ...col,
+          name: 'Category',
+          tasks: (tasks.value
+            .filter((task) => {
+              if (task.status !== 'backlog') return false;
+              // Derive task category id/name from legacy/new formats
+              const tIdRaw = String(task.categoryId || '').trim().toLowerCase();
+              const tCatRaw = String(task.category || task.categoryName || 'General').trim().toLowerCase();
+              return tIdRaw === selectedId || tCatRaw === categoryName;
+            })
+            .sort((a, b) => (a.categoryOrder ?? a.order ?? 0) - (b.categoryOrder ?? b.order ?? 0))) || [],
+        };
+      }
+      return {
+        ...col,
+        tasks: tasks.value.filter((task) => task.status === col.id) || [],
+      };
+    });
   });
 
   /**
@@ -35,6 +60,12 @@ export function useTasks(selectedBoard, user = null) {
         const timeB = b.completedAt ? (typeof b.completedAt.toMillis === 'function' ? b.completedAt.toMillis() : b.completedAt.getTime()) : 0;
         return timeB - timeA;
       }) || [];
+  });
+
+  // Backlog category counts keyed by display name, mapped to board-defined categories
+  const backlogCategoryCounts = computed(() => {
+    const boardCats = selectedBoard.value?.categories || [];
+    return buildCategoryCounts(tasks.value, boardCats);
   });
 
   /**
@@ -57,7 +88,27 @@ export function useTasks(selectedBoard, user = null) {
 
       // Subscribe to tasks
       unsubscribeTasks = subscribeToTasks(boardId, (tasksData) => {
-        tasks.value = tasksData;
+        // Normalize incoming tasks for legacy fields
+        const boardCats = selectedBoard.value?.categories || [];
+        const normalizedBoard = normalizeCategories(boardCats);
+        const byId = new Map(normalizedBoard.map((c) => [String(c.id || '').trim().toLowerCase(), c]));
+        const byName = new Map(normalizedBoard.map((c) => [String(c.name || '').trim().toLowerCase(), c]));
+        tasks.value = tasksData.map((t) => {
+          const idRaw = String(t.categoryId || '').trim().toLowerCase();
+          const nameRaw = String(t.category || t.categoryName || 'General').trim().toLowerCase();
+          const match = byId.get(idRaw) || byName.get(nameRaw);
+          if (!match) {
+            // Category deleted → revert to General
+            return { ...t, categoryId: 'general', categoryName: 'General', categoryColor: '#3b82f6', category: 'General' };
+          }
+          return {
+            ...t,
+            categoryId: t.categoryId || match.id,
+            categoryName: t.categoryName || match.name,
+            categoryColor: t.categoryColor || match.color,
+            category: t.category || match.name,
+          };
+        });
         isLoading.value = false;
       });
     } catch (err) {
@@ -198,11 +249,22 @@ export function useTasks(selectedBoard, user = null) {
     try {
       error.value = null;
       
-      // Update tasks with new order
-      const tasksWithOrder = reorderedTasks.map((task, index) => ({
+      // Update tasks with new order. For backlog, also maintain per-category order.
+      let tasksWithOrder = reorderedTasks.map((task, index) => ({
         ...task,
         order: index
       }));
+
+      if (columnId === 'backlog') {
+        // Compute category-specific indexes
+        const byCategory = new Map();
+        tasksWithOrder = tasksWithOrder.map((task) => {
+          const cat = (task.category || 'General');
+          const next = byCategory.get(cat) ?? 0;
+          byCategory.set(cat, next + 1);
+          return { ...task, categoryOrder: next };
+        });
+      }
 
       await reorderTasks(selectedBoard.value.id, tasksWithOrder);
       
@@ -309,11 +371,40 @@ export function useTasks(selectedBoard, user = null) {
     cleanup();
     if (newBoard) {
       loadTasks(newBoard.id);
+      // Initialize selected backlog category to 'General' if available, else first category
+      const categories = newBoard.categories || [];
+      const hasGeneral = categories.some((c) => (c.name || '').toLowerCase() === 'general');
+      if (hasGeneral) {
+        selectedBacklogCategory.value = 'General';
+      } else if (categories.length > 0) {
+        selectedBacklogCategory.value = categories[0].name;
+      } else {
+        selectedBacklogCategory.value = 'General';
+      }
     } else {
       tasks.value = [];
       selectedTask.value = null;
     }
   }, { immediate: true });
+
+  // Keep selected category valid when board categories change
+  watch(
+    () => selectedBoard.value && selectedBoard.value.categories,
+    (cats) => {
+      if (!selectedBoard.value) return;
+      const list = Array.isArray(cats) ? cats : [];
+      const names = list.map((c) => c.name);
+      const normSelected = String(selectedBacklogCategory.value || 'General').trim().toLowerCase();
+      const available = new Set([
+        ...names.map((n) => String(n || '').trim().toLowerCase()),
+        ...Object.keys(backlogCategoryCounts.value || {}).map((n) => String(n || '').trim().toLowerCase())
+      ]);
+      if (!available.has(normSelected)) {
+        selectedBacklogCategory.value = available.has('general') ? 'General' : (names[0] || 'General');
+      }
+    },
+    { immediate: true, deep: true }
+  );
 
   return {
     tasks,
@@ -322,6 +413,8 @@ export function useTasks(selectedBoard, user = null) {
     error,
     computedColumns,
     doneTasks,
+    backlogCategoryCounts,
+    selectedBacklogCategory,
     addTask,
     saveTask,
     deleteTask,
