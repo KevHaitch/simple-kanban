@@ -50,15 +50,23 @@ export default {
         })
       }
     },
-    refreshApp() {
+    async refreshApp() {
+      this.showUpdateNotification = false
+      
       if (this.registration && this.registration.waiting) {
         // Send message to service worker to skip waiting and activate new version
         this.registration.waiting.postMessage({ type: 'SKIP_WAITING' })
+        
+        // Wait for the service worker to activate, then do a hard refresh
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          // Hard refresh to bypass cache and load new version
+          window.location.href = window.location.href
+        }, { once: true })
+      } else {
+        // If no waiting service worker, do a hard refresh immediately
+        // Using location.href assignment forces a full page reload bypassing cache
+        window.location.href = window.location.href + '?v=' + Date.now()
       }
-      
-      // Reload the page to load new version
-      window.location.reload()
-      this.showUpdateNotification = false
     }
   }
 }
