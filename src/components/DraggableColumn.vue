@@ -377,11 +377,8 @@ export default {
   /* Subtle glass panel effect */
   background: rgba(255, 255, 255, 0.02);
   backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  box-shadow: 
-    0 4px 6px -1px rgba(0, 0, 0, 0.1),
-    0 2px 4px -1px rgba(0, 0, 0, 0.06),
-    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: inset 0 0px 40px rgba(255, 255, 255, 0.15);
 }
 
 /* Scrollbar styling for Webkit browsers */
