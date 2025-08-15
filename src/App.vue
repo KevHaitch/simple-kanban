@@ -41,6 +41,7 @@
     <landing-page v-else @sign-in="signInWithGoogle" />
     <task-modal
       v-if="selectedTask"
+      :key="`task-${selectedTask.id}`"
       :task="selectedTask"
       :boardId="selectedBoard?.id"
       :board-collaborators="selectedBoard?.collaboratorDetails || []"

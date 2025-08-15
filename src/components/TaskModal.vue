@@ -165,6 +165,7 @@ import { Dialog, DialogPanel, DialogTitle } from '@headlessui/vue';
 import { TrashIcon } from '@heroicons/vue/24/outline';
 import { doc, deleteDoc, getDoc } from 'firebase/firestore';
 import { db, auth } from '../firebase';
+import { deleteTask as removeTask } from '../services/taskService.js';
 import debounce from 'lodash/debounce';
 import AssigneeChip from './AssigneeChip.vue';
 import CategoryChip from './CategoryChip.vue';
@@ -474,9 +475,9 @@ export default {
 
     const deleteTask = async () => {
       try {
-        // Delegate deletion to parent via emitted id
-        if (localTask.value.id) {
-          emit('delete', localTask.value.id);
+        // Call deleteTask service directly instead of relying on parent events
+        if (localTask.value.id && props.boardId) {
+          await removeTask(props.boardId, localTask.value.id);
         }
         showDeleteConfirmation.value = false;
         emit('close');
@@ -579,6 +580,8 @@ export default {
       projectCollaborators,
       titleTextarea,
       descriptionTextarea,
+      dialogInitialFocus,
+      noFocusRef,
       handleStatusChange,
       addAssignee,
       removeAssignee,
