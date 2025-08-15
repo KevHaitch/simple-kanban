@@ -1,7 +1,6 @@
 <template>
-  <Dialog :open="true" :initialFocus="dialogInitialFocus" @close="handleClose" class="relative z-50">
-    <div class="fixed inset-0 bg-black/50 backdrop-blur-sm" aria-hidden="true" />
-    
+  <div class="modal-overlay fixed inset-0 bg-black/50 backdrop-blur-sm" aria-hidden="true" />
+  <Dialog :open="true" :initialFocus="dialogInitialFocus" @close="handleClose" class="relative z-1050">
     <div class="fixed inset-0 flex items-center justify-center p-4">
       <DialogPanel class="modal-content">
         <button ref="noFocusRef" class="sr-only" tabindex="0" aria-hidden="true"></button>
@@ -138,9 +137,7 @@
   </Dialog>
   
   <!-- Delete Confirmation Dialog -->
-  <Dialog :open="showDeleteConfirmation" @close="showDeleteConfirmation = false" class="relative z-60">
-    <div class="fixed inset-0 bg-black/70 backdrop-blur-sm" aria-hidden="true" />
-    
+  <Dialog :open="showDeleteConfirmation" @close="showDeleteConfirmation = false" class="relative z-1100">  
     <div class="fixed inset-0 flex items-center justify-center p-4">
       <DialogPanel class="confirmation-dialog">
         <DialogTitle class="confirmation-title">Delete task</DialogTitle>
@@ -477,10 +474,10 @@ export default {
 
     const deleteTask = async () => {
       try {
+        // Delegate deletion to parent via emitted id
         if (localTask.value.id) {
-          await deleteDoc(doc(db, 'boards', props.boardId, 'tasks', localTask.value.id));
+          emit('delete', localTask.value.id);
         }
-        emit('delete', localTask.value);
         showDeleteConfirmation.value = false;
         emit('close');
       } catch (error) {
@@ -610,7 +607,11 @@ export default {
 <style scoped lang="css">
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap');
 
-/* Base Styles */
+/* Ensure modal overlay and panel are above app */
+.modal-overlay {
+  z-index: 1000;
+}
+
 .modal-content {
   max-width: 800px;
   width: 100%;
@@ -621,8 +622,30 @@ export default {
   color: #e6e6e9;
   font-family: 'Poppins', sans-serif;
   overflow: hidden;
+  position: relative;
+  z-index: 1001;
 }
 
+/* Confirmation dialog should sit above main modal */
+.confirmation-overlay {
+  z-index: 1100;
+}
+
+.confirmation-dialog {
+  max-width: 400px;
+  width: 100%;
+  background-color: #1a1a27;
+  padding: 1.5rem;
+  border-radius: 12px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2);
+  color: #e6e6e9;
+  font-family: 'Poppins', sans-serif;
+  border: 1px solid #2d2d3a;
+  position: relative;
+  z-index: 1101;
+}
+
+/* Base Styles */
 .sr-only {
   position: absolute;
   width: 1px;
