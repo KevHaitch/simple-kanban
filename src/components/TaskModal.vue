@@ -182,7 +182,7 @@ export default {
     CategoryChip,
     CategorySelect
   },
-  props: ['task', 'boardId', 'boardCollaborators', 'boardCategories'],
+  props: ['task', 'boardId', 'boardCollaborators', 'boardCategories', 'onDelete'],
   emits: ['close', 'save', 'delete'],
   setup(props, { emit }) {
     const localTask = ref({
@@ -474,14 +474,17 @@ export default {
 
     const deleteTask = async () => {
       try {
-        // Emit the delete event to parent component instead of calling service directly
-        if (localTask.value.id) {
-          emit('delete', localTask.value.id);
+        if (localTask.value.id && props.onDelete) {
+          // Close the confirmation dialog first
+          showDeleteConfirmation.value = false;
+          
+          // Call the delete function passed as prop
+          await props.onDelete(localTask.value.id);
+        } else {
+          console.error('TaskModal: No task ID found or onDelete prop missing');
         }
-        showDeleteConfirmation.value = false;
-        emit('close');
       } catch (error) {
-        console.error('Error deleting task:', error);
+        console.error('TaskModal: Error in deleteTask:', error);
       }
     };
 

@@ -46,9 +46,9 @@
       :boardId="selectedBoard?.id"
       :board-collaborators="selectedBoard?.collaboratorDetails || []"
       :board-categories="selectedBoard?.categories || []"
+      :onDelete="deleteTaskHandler"
       @close="closeTaskModal"
       @save="saveTask"
-      @delete="deleteTask"
     />
     <project-modal
       v-if="showProjectModal"
@@ -180,6 +180,14 @@ export default {
       closeTaskModal: tasks.closeTaskModal,
       saveTask: tasks.saveTask,
       deleteTask: tasks.deleteTask,
+      deleteTaskHandler: async (taskId) => {
+        try {
+          await tasks.deleteTask(taskId);
+          tasks.closeTaskModal();
+        } catch (error) {
+          console.error('App.vue: Delete failed:', error);
+        }
+      },
       handleTaskMoved: tasks.handleTaskMoved,
       handleTasksReordered: tasks.handleTasksReordered,
       
