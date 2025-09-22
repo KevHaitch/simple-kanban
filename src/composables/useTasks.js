@@ -191,9 +191,14 @@ export function useTasks(selectedBoard, user = null) {
    * Delete a task
    */
   async function deleteTask(taskId) {
-    if (!selectedBoard.value || !taskId) {
-      throw new Error('Board and task ID are required');
+    if (!selectedBoard.value) {
+      throw new Error('No board selected');
     }
+    if (!taskId) {
+      throw new Error('Task ID is required');
+    }
+
+    console.log('Deleting task:', { taskId, boardId: selectedBoard.value.id });
 
     try {
       error.value = null;
@@ -206,9 +211,16 @@ export function useTasks(selectedBoard, user = null) {
       if (selectedTask.value && selectedTask.value.id === taskId) {
         selectedTask.value = null;
       }
+
+      console.log('Task deleted successfully');
     } catch (err) {
       error.value = err.message;
-      console.error('Error deleting task:', err);
+      console.error('Error deleting task:', {
+        taskId,
+        boardId: selectedBoard.value.id,
+        error: err.message,
+        fullError: err
+      });
       throw err;
     }
   }
