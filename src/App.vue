@@ -234,7 +234,8 @@ export default {
       // Mobile (<576px): 1 column
       // Single combined column with ALL categories and statuses
       if (layout === 'mobile') {
-        const backlog = allColumns.find(c => c.id === 'backlog');
+        // Get ALL backlog tasks (not filtered by category like desktop)
+        const allBacklogTasks = tasks.tasks.value.filter(t => t.status === 'backlog');
         const ready = allColumns.find(c => c.id === 'ready');
         const inProgress = allColumns.find(c => c.id === 'in-progress');
         const review = allColumns.find(c => c.id === 'review');
@@ -253,6 +254,7 @@ export default {
           name: 'General',
           count: backlogCounts['general'] || 0,
           isBacklog: true,
+          categoryId: 'general',
           categoryName: 'General'
         });
         
@@ -264,6 +266,7 @@ export default {
               name: cat.name,
               count: backlogCounts[cat.id] || 0,
               isBacklog: true,
+              categoryId: cat.id,
               categoryName: cat.name
             });
           }
@@ -287,11 +290,14 @@ export default {
         );
         
         if (selectedBacklogCol) {
-          // Show backlog tasks for selected category - filter by category
+          // Show backlog tasks for selected category - filter by categoryId
+          const categoryId = selectedBacklogCol.categoryId.toLowerCase();
           const categoryName = selectedBacklogCol.categoryName.toLowerCase();
-          selectedTasks = (backlog?.tasks || []).filter(task => {
-            const taskCat = (task.category || task.categoryName || 'General').toLowerCase();
-            return taskCat === categoryName;
+          selectedTasks = allBacklogTasks.filter(task => {
+            // Check both categoryId and category name for flexibility
+            const taskCatId = (task.categoryId || '').toLowerCase();
+            const taskCatName = (task.category || task.categoryName || 'General').toLowerCase();
+            return taskCatId === categoryId || taskCatName === categoryName;
           });
         } else if (selectedStatusCol) {
           // Show tasks for selected status

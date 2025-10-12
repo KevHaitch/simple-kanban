@@ -93,8 +93,9 @@
         ghost-class="ghost-card"
         chosen-class="chosen"
         drag-class="dragging"
-        :delay="200"
+        :delay="500"
         :delayOnTouchOnly="true"
+        :touchStartThreshold="5"
         @end="onDragEnd"
         @change="onChange"
         @move="onMove"
@@ -600,7 +601,7 @@ export default {
 .draggable-task-card {
   width: 100%;
   cursor: pointer;
-  touch-action: none; /* Important for mobile drag and drop */
+  touch-action: pan-y; /* Allow vertical scrolling on mobile, but support long-press drag */
 }
 
 /* Initial selection doesn't have rotation */
