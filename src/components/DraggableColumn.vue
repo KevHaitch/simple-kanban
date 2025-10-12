@@ -647,27 +647,39 @@ export default {
 /* Unified drag state for both desktop and touch */
 /* Original card when picked up: dotted outline, inner shadow, semi-transparent */
 .chosen {
-  opacity: 0.25 !important;
+  opacity: 0.5 !important;
   border: 2px dotted #6c6c84 !important;
   box-shadow: inset 0 0 20px 10px rgba(0, 0, 0, 0.3) !important;
   cursor: grabbing;
   z-index: 10;
   transform: none !important; /* No rotation */
+  background-color: #1e1e2e !important;
 }
 
-/* Remove the separate dragging state - use chosen for everything */
+.chosen * {
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+/* Floating ghost that follows cursor - same styling */
 .dragging {
-  opacity: 0.25 !important;
+  opacity: 0.5 !important;
   border: 2px dotted #6c6c84 !important;
   box-shadow: inset 0 0 20px 10px rgba(0, 0, 0, 0.3) !important;
   cursor: grabbing;
-  z-index: 10;
+  z-index: 1000;
   transform: none !important; /* No rotation */
+  background-color: #1e1e2e !important;
+}
+
+.dragging * {
+  visibility: visible !important;
+  opacity: 1 !important;
 }
 
 /* Drop target placeholder: exact replica of card with draggable state styling */
 .ghost-card {
-  opacity: 0.25 !important;
+  opacity: 0.5 !important;
   background-color: #1e1e2e !important; /* Keep card background visible */
   border: 2px dotted #6c6c84 !important;
   border-radius: 6px !important;
@@ -682,10 +694,31 @@ export default {
   opacity: 1 !important; /* Content inherits parent opacity */
 }
 
-/* Hide any floating clones - we only want in-place placeholders */
-.sortable-fallback {
-  opacity: 0 !important;
-  visibility: hidden !important;
+/* Hide floating ghost on touch - only show outlines */
+@media (hover: none) {
+  .sortable-fallback,
+  .dragging {
+    opacity: 0 !important;
+    visibility: hidden !important;
+    display: none !important;
+  }
+}
+
+/* Desktop: floating ghost matches other ghost styling */
+@media (hover: hover) {
+  .sortable-fallback {
+    opacity: 0.5 !important;
+    border: 2px dotted #6c6c84 !important;
+    box-shadow: inset 0 0 20px 10px rgba(0, 0, 0, 0.3) !important;
+    transform: none !important;
+    cursor: grabbing !important;
+    z-index: 1000 !important;
+  }
+
+  .sortable-fallback * {
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
 }
 
 @media (hover: hover) {
