@@ -13,7 +13,7 @@
           <div v-else class="user-avatar-fallback">
             {{ getUserInitials() }}
           </div>
-          <span v-if="getShortName()" class="user-name">{{ getShortName() }}</span>
+          <span v-if="getShortName() && !hideName" class="user-name">{{ getShortName() }}</span>
         </MenuButton>
       </div>
 
@@ -139,6 +139,10 @@ export default {
     boards: Array,
     selectedBoardId: String,
     selectedBoard: Object,
+    hideName: {
+      type: Boolean,
+      default: false
+    }
   },
   emits: ['select-board', 'new-project', 'edit-project', 'edit-categories', 'sign-out'],
   methods: {

@@ -2,6 +2,7 @@
   
   <div class="column">
     <div class="column-header">
+      <!-- Backlog with category selector -->
       <template v-if="column.id === 'backlog'">
         <div class="category-header">
           <CategorySelect
@@ -13,6 +14,72 @@
           />
         </div>
       </template>
+      
+      <!-- Combined column with status selector -->
+      <template v-else-if="isCombined">
+        <div class="category-header">
+          <button 
+            @click="toggleCombinedDropdown" 
+            class="category-button"
+          >
+            <span class="category-title">
+              {{ selectedCombinedColumnDisplay }} ({{ column.tasks.length }})
+            </span>
+            <svg 
+              class="category-caret" 
+              :class="{ 'open': showCombinedDropdown }"
+              xmlns="http://www.w3.org/2000/svg" 
+              viewBox="0 0 20 20" 
+              fill="currentColor"
+            >
+              <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+            </svg>
+          </button>
+          
+          <!-- Mobile two-column layout -->
+          <div v-if="showCombinedDropdown && isMobileLayout" class="category-menu mobile-two-column">
+            <div class="mobile-column">
+              <div class="mobile-column-header">Backlog</div>
+              <div 
+                v-for="cat in backlogCategories" 
+                :key="cat.id"
+                @click="selectCombinedColumn(cat.id)"
+                class="category-menu-item"
+                :class="{ 'selected': selectedCombinedColumn === cat.id }"
+              >
+                {{ cat.name }} ({{ cat.count }})
+              </div>
+            </div>
+            <div class="mobile-column">
+              <div class="mobile-column-header">Status</div>
+              <div 
+                v-for="col in statusColumns" 
+                :key="col.id"
+                @click="selectCombinedColumn(col.id)"
+                class="category-menu-item"
+                :class="{ 'selected': selectedCombinedColumn === col.id }"
+              >
+                {{ col.name }} ({{ col.count }})
+              </div>
+            </div>
+          </div>
+          
+          <!-- Regular single-column layout for tablet/desktop-small -->
+          <div v-else-if="showCombinedDropdown" class="category-menu">
+            <div 
+              v-for="col in combinedColumns" 
+              :key="col.id"
+              @click="selectCombinedColumn(col.id)"
+              class="category-menu-item"
+              :class="{ 'selected': selectedCombinedColumn === col.id }"
+            >
+              {{ col.name }} ({{ col.count }})
+            </div>
+          </div>
+        </div>
+      </template>
+      
+      <!-- Regular column header -->
       <template v-else>
         <h3>{{ column.name }} ({{ column.tasks.length }})</h3>
       </template>
@@ -98,13 +165,40 @@ export default {
     boardCategories: {
       type: Array,
       default: () => []
+    },
+    // For combined columns (responsive mode)
+    isCombined: {
+      type: Boolean,
+      default: false
+    },
+    combinedColumns: {
+      type: Array,
+      default: () => []
+    },
+    selectedCombinedColumn: {
+      type: String,
+      default: null
+    },
+    // For mobile two-column layout
+    isMobileLayout: {
+      type: Boolean,
+      default: false
+    },
+    backlogCategories: {
+      type: Array,
+      default: () => []
+    },
+    statusColumns: {
+      type: Array,
+      default: () => []
     }
   },
-  emits: ['openTask', 'taskMoved', 'tasksReordered', 'updateBacklogCategory'],
+  emits: ['openTask', 'taskMoved', 'tasksReordered', 'updateBacklogCategory', 'updateCombinedColumn'],
   setup(props, { emit }) {
-    const { column, selectedBacklogCategory } = toRefs(props);
+    const { column, selectedBacklogCategory, isCombined, selectedCombinedColumn } = toRefs(props);
     const isDraggingOver = ref(false);
     const isDragging = ref(false);
+    const showCombinedDropdown = ref(false);
     
     // Add global styles to ensure consistent placeholder appearance
     onMounted(() => {
@@ -246,6 +340,35 @@ export default {
       return opts;
     });
 
+    // Combined column display name
+    const selectedCombinedColumnDisplay = computed(() => {
+      if (!isCombined.value || !selectedCombinedColumn.value) return '';
+      
+      // Check if using mobile layout with separate lists
+      if (props.isMobileLayout) {
+        const backlogCat = props.backlogCategories.find(c => c.id === selectedCombinedColumn.value);
+        if (backlogCat) return backlogCat.name;
+        
+        const statusCol = props.statusColumns.find(c => c.id === selectedCombinedColumn.value);
+        if (statusCol) return statusCol.name;
+      }
+      
+      // Fall back to combined columns list
+      const col = props.combinedColumns.find(c => c.id === selectedCombinedColumn.value);
+      return col ? col.name : '';
+    });
+
+    // Toggle combined column dropdown
+    const toggleCombinedDropdown = () => {
+      showCombinedDropdown.value = !showCombinedDropdown.value;
+    };
+
+    // Select a combined column
+    const selectCombinedColumn = (columnId) => {
+      emit('updateCombinedColumn', columnId);
+      showCombinedDropdown.value = false;
+    };
+
     return {
       columnTasks,
       onDragEnd,
@@ -257,7 +380,12 @@ export default {
       selectedCategoryProxy,
       categoryOptions,
       backlogCategoryCounts: props.backlogCategoryCounts,
-      countsById
+      countsById,
+      // Combined column props
+      showCombinedDropdown,
+      selectedCombinedColumnDisplay,
+      toggleCombinedDropdown,
+      selectCombinedColumn
     };
   }
 };
@@ -265,7 +393,6 @@ export default {
 
 <style scoped>
 .column {
-  width: 19%;
   color: #e6e6e9;
   display: flex;
   flex-direction: column;
@@ -349,6 +476,44 @@ export default {
   z-index: 10;
 }
 
+/* Mobile two-column layout */
+.category-menu.mobile-two-column {
+  display: flex;
+  gap: 12px;
+  min-width: 90vw; /* Responsive width for mobile */
+  max-width: 400px;
+  padding: 10px 8px 8px 8px;
+}
+
+.mobile-column {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px; /* Tighter spacing */
+  min-width: 0; /* Allow text to truncate */
+}
+
+.mobile-column-header {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #a1a1b5;
+  padding: 2px 8px 4px 8px;
+  margin-bottom: 2px;
+  border-bottom: 1px solid #2d2d3a;
+}
+
+/* Condensed menu items for mobile two-column layout */
+.mobile-two-column .category-menu-item {
+  padding: 6px 8px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .category-menu-item {
   padding: 8px 10px;
   color: #6c6c84;
@@ -361,6 +526,12 @@ export default {
 .category-menu-item:hover {
   background: rgba(255,255,255,0.06);
   color: #e6e6e9;
+}
+
+.category-menu-item.selected {
+  background: rgba(99, 102, 241, 0.2);
+  color: #6366f1;
+  font-weight: 600;
 }
 
 .task-list {

@@ -34,6 +34,13 @@ export function useSearch(tasks) {
   }
 
   /**
+   * Open search modal (for mobile button)
+   */
+  function openSearchModal() {
+    showSearchModal.value = true;
+  }
+
+  /**
    * Close search modal
    */
   function closeSearchModal() {
@@ -66,6 +73,7 @@ export function useSearch(tasks) {
     showSearchModal,
     isSearching,
     performSearch,
+    openSearchModal,
     closeSearchModal,
     openTaskFromSearch,
     clearSearch

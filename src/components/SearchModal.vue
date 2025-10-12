@@ -2,7 +2,7 @@
   <div v-if="isOpen" class="modal-overlay" @click="closeModal">
     <div class="modal-content" @click.stop>
       <div class="modal-header">
-        <h2>Search Results</h2>
+        <h2>Search Tasks</h2>
         <button @click="closeModal" class="close-btn">
           <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 20 20" fill="currentColor">
             <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
@@ -10,7 +10,29 @@
         </button>
       </div>
       
-      <div class="search-info">
+      <!-- Search Input -->
+      <div class="search-input-container">
+        <form @submit.prevent="handleSearch" class="search-form">
+          <input
+            v-model="localSearchQuery"
+            ref="searchInput"
+            type="text"
+            placeholder="Search tasks and/or @user ..."
+            class="search-input"
+            @keyup.enter="handleSearch"
+          />
+          <div class="search-actions">
+            <button type="button" @click="closeModal" class="cancel-btn">
+              Cancel
+            </button>
+            <button type="submit" class="search-submit-btn" :disabled="!localSearchQuery.trim()">
+              Search
+            </button>
+          </div>
+        </form>
+      </div>
+      
+      <div v-if="hasSearched" class="search-info">
         <p v-if="searchQuery">
           <span v-if="hasUsernameSearch && hasKeywordSearch">
             Found {{ results.length }} task{{ results.length !== 1 ? 's' : '' }} assigned to users matching "{{ getUsernameFromQuery }}" with "{{ getKeywordsFromQuery }}"
@@ -24,8 +46,8 @@
         </p>
       </div>
       
-      <div class="results-container">
-        <div v-if="results.length === 0" class="no-results">
+      <div v-if="hasSearched" class="results-container">
+        <div v-if="results.length === 0 && localSearchQuery.trim()" class="no-results">
           <svg xmlns="http://www.w3.org/2000/svg" class="no-results-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
@@ -86,6 +108,7 @@
 </template>
 
 <script>
+import { ref, watch, nextTick } from 'vue';
 import userStore from '../userStore';
 import colorService from '../services/colorService';
 
@@ -105,7 +128,59 @@ export default {
       default: ''
     }
   },
-  emits: ['close', 'open-task'],
+  emits: ['close', 'open-task', 'search', 'update:searchQuery'],
+  setup(props, { emit }) {
+    const localSearchQuery = ref(props.searchQuery || '');
+    const hasSearched = ref(!!props.searchQuery);
+    const searchInput = ref(null);
+    
+    // Watch for modal opening and focus input
+    watch(() => props.isOpen, (newVal) => {
+      if (newVal) {
+        hasSearched.value = !!props.searchQuery;
+        localSearchQuery.value = props.searchQuery || '';
+        nextTick(() => {
+          if (searchInput.value) {
+            searchInput.value.focus();
+          }
+        });
+      }
+    });
+    
+    // Watch for external searchQuery changes
+    watch(() => props.searchQuery, (newVal) => {
+      localSearchQuery.value = newVal || '';
+      if (newVal) {
+        hasSearched.value = true;
+      }
+    });
+    
+    const handleSearch = () => {
+      if (localSearchQuery.value.trim()) {
+        hasSearched.value = true;
+        emit('update:searchQuery', localSearchQuery.value);
+        emit('search');
+      }
+    };
+    
+    const closeModal = () => {
+      emit('close');
+    };
+    
+    const openTask = (task) => {
+      emit('open-task', task);
+      closeModal();
+    };
+    
+    return {
+      localSearchQuery,
+      hasSearched,
+      searchInput,
+      handleSearch,
+      closeModal,
+      openTask
+    };
+  },
   computed: {
     hasUsernameSearch() {
       return /@\w+/.test(this.searchQuery);
@@ -123,13 +198,6 @@ export default {
     }
   },
   methods: {
-    closeModal() {
-      this.$emit('close');
-    },
-    openTask(task) {
-      this.$emit('open-task', task);
-      this.closeModal();
-    },
     highlightMatch(text, query) {
       if (!query || !text) return text;
       
@@ -250,6 +318,81 @@ export default {
 .icon {
   width: 20px;
   height: 20px;
+}
+
+.search-input-container {
+  padding: 1.5rem 2rem;
+  border-bottom: 1px solid #2d2d3a;
+  background-color: #1a1a27;
+}
+
+.search-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.search-input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background-color: #252535;
+  border: 2px solid #2d2d3a;
+  border-radius: 8px;
+  color: #e6e6e9;
+  font-size: 1rem;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.search-input:focus {
+  border-color: #6366f1;
+}
+
+.search-input::placeholder {
+  color: #6c6c84;
+}
+
+.search-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.cancel-btn {
+  padding: 0.5rem 1.25rem;
+  background-color: transparent;
+  border: 1px solid #2d2d3a;
+  border-radius: 6px;
+  color: #e6e6e9;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.cancel-btn:hover {
+  background-color: #2d2d3a;
+}
+
+.search-submit-btn {
+  padding: 0.5rem 1.25rem;
+  background-color: #6366f1;
+  border: none;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.search-submit-btn:hover:not(:disabled) {
+  background-color: #5558e3;
+}
+
+.search-submit-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .search-info {

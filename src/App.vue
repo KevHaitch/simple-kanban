@@ -14,11 +14,12 @@
         @new-task="handleNewTask"
         @toggle-changelog="toggleChangelog"
         @search="performSearch"
+        @open-search-modal="openSearchModal"
       />
       <div v-if="selectedBoard">
-        <div class="columns">
+        <div class="columns" :class="`layout-${columnLayout}`">
           <draggable-column 
-            v-for="col in computedColumns" 
+            v-for="col in responsiveColumns" 
             :key="col.id"
             :column="col"
             :selected-backlog-category="selectedBacklogCategory"
@@ -27,10 +28,17 @@
             :emptyMessage="getRandomEmptyMessage()"
             :board-collaborators="selectedBoard.collaboratorDetails || []"
             :board-categories="selectedBoard.categories || []"
+            :is-combined="col.isCombined || false"
+            :combined-columns="col.combinedColumns || []"
+            :selected-combined-column="col.id === 'combined' ? selectedCombinedStatus : null"
+            :is-mobile-layout="col.isMobileLayout || false"
+            :backlog-categories="col.backlogCategories || []"
+            :status-columns="col.statusColumns || []"
             @open-task="openTaskModal"
             @task-moved="handleTaskMoved"
             @tasks-reordered="handleTasksReordered"
             @updateBacklogCategory="setBacklogCategory"
+            @updateCombinedColumn="setSelectedCombinedStatus"
           />
         </div>
       </div>
@@ -77,15 +85,16 @@
       v-if="showSearchModal"
       :is-open="showSearchModal"
       :results="searchResults"
-      :search-query="searchQuery"
+      v-model:search-query="searchQuery"
       @close="closeSearchModal"
       @open-task="openTaskFromSearch"
+      @search="performSearch"
     />
   </div>
 </template>
 
 <script>
-import { ref, onBeforeUnmount } from 'vue';
+import { ref, computed, onBeforeUnmount } from 'vue';
 import AppHeader from './components/AppHeader.vue';
 import TaskModal from './components/TaskModal.vue';
 import UserDropdown from './components/UserDropdown.vue';
@@ -101,6 +110,7 @@ import { useBoards } from './composables/useBoards';
 import { useTasks } from './composables/useTasks';
 import { useSearch } from './composables/useSearch';
 import { useModals } from './composables/useModals';
+import { useBreakpoint } from './composables/useBreakpoint';
 import { getRandomEmptyMessage } from './constants/messages';
 
 export default {
@@ -124,6 +134,7 @@ export default {
     const tasks = useTasks(boards.selectedBoard, auth.user);
     const search = useSearch(tasks.tasks);
     const modals = useModals();
+    const breakpoint = useBreakpoint();
 
     // Cleanup on unmount
     onBeforeUnmount(() => {
@@ -135,6 +146,174 @@ export default {
       // Ensure we update the ref's value, not reassign the ref
       tasks.selectedBacklogCategory.value = val;
     }
+
+    // Track selected combined status for responsive views
+    // Default to 'backlog-general' for mobile, 'ready' for others
+    const getInitialCombinedStatus = () => {
+      return breakpoint.isMobile.value ? 'backlog-general' : 'ready';
+    };
+    
+    const selectedCombinedStatus = ref(getInitialCombinedStatus());
+
+    function setSelectedCombinedStatus(statusId) {
+      selectedCombinedStatus.value = statusId;
+    }
+    
+    // Watch for layout changes and update default if needed
+    // When switching to mobile for the first time, default to backlog
+    let hasSetMobileDefault = false;
+    const unwatchLayout = breakpoint.columnLayout.value;
+    if (breakpoint.isMobile.value && !hasSetMobileDefault) {
+      selectedCombinedStatus.value = 'backlog-general';
+      hasSetMobileDefault = true;
+    }
+
+    // Compute responsive columns based on breakpoint
+    const responsiveColumns = computed(() => {
+      const allColumns = tasks.computedColumns.value;
+      const layout = breakpoint.columnLayout.value;
+
+      // Desktop Large (≥1200px): Show all 5 columns
+      if (layout === 'desktop-large') {
+        return allColumns;
+      }
+
+      // Desktop Small (992-1199px): 4 columns
+      // backlog, combined(ready+in-progress+review), qa, done
+      if (layout === 'desktop-small') {
+        const backlog = allColumns.find(c => c.id === 'backlog');
+        const ready = allColumns.find(c => c.id === 'ready');
+        const inProgress = allColumns.find(c => c.id === 'in-progress');
+        const review = allColumns.find(c => c.id === 'review');
+        const qa = allColumns.find(c => c.id === 'qa');
+        const done = allColumns.find(c => c.id === 'done');
+
+        const combined = {
+          id: 'combined',
+          name: 'Combined',
+          isCombined: true,
+          combinedColumns: [
+            { id: 'ready', name: 'Ready', count: ready?.tasks?.length || 0 },
+            { id: 'in-progress', name: 'In Progress', count: inProgress?.tasks?.length || 0 },
+            { id: 'review', name: 'Review', count: review?.tasks?.length || 0 }
+          ],
+          tasks: [ready, inProgress, review]
+            .find(c => c?.id === selectedCombinedStatus.value)?.tasks || []
+        };
+
+        return [backlog, combined, qa, done].filter(Boolean);
+      }
+
+      // Tablet (576-991px): 3 columns
+      // backlog, combined(ready+in-progress+review+qa), done
+      if (layout === 'tablet') {
+        const backlog = allColumns.find(c => c.id === 'backlog');
+        const ready = allColumns.find(c => c.id === 'ready');
+        const inProgress = allColumns.find(c => c.id === 'in-progress');
+        const review = allColumns.find(c => c.id === 'review');
+        const qa = allColumns.find(c => c.id === 'qa');
+        const done = allColumns.find(c => c.id === 'done');
+
+        const combined = {
+          id: 'combined',
+          name: 'Combined',
+          isCombined: true,
+          combinedColumns: [
+            { id: 'ready', name: 'Ready', count: ready?.tasks?.length || 0 },
+            { id: 'in-progress', name: 'In Progress', count: inProgress?.tasks?.length || 0 },
+            { id: 'review', name: 'Review', count: review?.tasks?.length || 0 },
+            { id: 'qa', name: 'QA', count: qa?.tasks?.length || 0 }
+          ],
+          tasks: [ready, inProgress, review, qa]
+            .find(c => c?.id === selectedCombinedStatus.value)?.tasks || []
+        };
+
+        return [backlog, combined, done].filter(Boolean);
+      }
+
+      // Mobile (<576px): 1 column
+      // Single combined column with ALL categories and statuses
+      if (layout === 'mobile') {
+        const backlog = allColumns.find(c => c.id === 'backlog');
+        const ready = allColumns.find(c => c.id === 'ready');
+        const inProgress = allColumns.find(c => c.id === 'in-progress');
+        const review = allColumns.find(c => c.id === 'review');
+        const qa = allColumns.find(c => c.id === 'qa');
+
+        // Build combined columns list including backlog categories
+        const boardCats = boards.selectedBoard.value?.categories || [];
+        const backlogCounts = tasks.backlogCategoryCounts.value || {};
+        
+        // Build backlog categories list
+        const backlogCategories = [];
+        
+        // Add General category (counts are keyed by ID, not name)
+        backlogCategories.push({
+          id: 'backlog-general',
+          name: 'General',
+          count: backlogCounts['general'] || 0,
+          isBacklog: true,
+          categoryName: 'General'
+        });
+        
+        // Add other categories (counts are keyed by ID, not name)
+        boardCats.forEach(cat => {
+          if (cat.name.toLowerCase() !== 'general') {
+            backlogCategories.push({
+              id: `backlog-${cat.id}`,
+              name: cat.name,
+              count: backlogCounts[cat.id] || 0,
+              isBacklog: true,
+              categoryName: cat.name
+            });
+          }
+        });
+        
+        // Build status columns list (without Done - that's in Changelog)
+        const statusColumns = [
+          { id: 'ready', name: 'Ready', count: ready?.tasks?.length || 0 },
+          { id: 'in-progress', name: 'In Progress', count: inProgress?.tasks?.length || 0 },
+          { id: 'review', name: 'Review', count: review?.tasks?.length || 0 },
+          { id: 'qa', name: 'QA', count: qa?.tasks?.length || 0 }
+        ];
+
+        // Get tasks for selected column
+        let selectedTasks = [];
+        const selectedBacklogCol = backlogCategories.find(c => 
+          c.id === selectedCombinedStatus.value
+        );
+        const selectedStatusCol = statusColumns.find(c => 
+          c.id === selectedCombinedStatus.value
+        );
+        
+        if (selectedBacklogCol) {
+          // Show backlog tasks for selected category - filter by category
+          const categoryName = selectedBacklogCol.categoryName.toLowerCase();
+          selectedTasks = (backlog?.tasks || []).filter(task => {
+            const taskCat = (task.category || task.categoryName || 'General').toLowerCase();
+            return taskCat === categoryName;
+          });
+        } else if (selectedStatusCol) {
+          // Show tasks for selected status
+          selectedTasks = [ready, inProgress, review, qa]
+            .find(c => c?.id === selectedCombinedStatus.value)?.tasks || [];
+        }
+
+        const combined = {
+          id: 'combined',
+          name: 'All Tasks',
+          isCombined: true,
+          isMobileLayout: true, // Flag to use two-column layout
+          backlogCategories,
+          statusColumns,
+          tasks: selectedTasks
+        };
+
+        return [combined];
+      }
+
+      return allColumns;
+    });
 
     // Removed backfill console exposure for security
 
@@ -191,11 +370,18 @@ export default {
       handleTaskMoved: tasks.handleTaskMoved,
       handleTasksReordered: tasks.handleTasksReordered,
       
+      // Responsive layout
+      columnLayout: breakpoint.columnLayout,
+      responsiveColumns,
+      selectedCombinedStatus,
+      setSelectedCombinedStatus,
+      
       // Search
       searchQuery: search.searchQuery,
       searchResults: search.searchResults,
       showSearchModal: search.showSearchModal,
       performSearch: search.performSearch,
+      openSearchModal: search.openSearchModal,
       closeSearchModal: search.closeSearchModal,
       openTaskFromSearch: (task) => search.openTaskFromSearch(task, tasks.openTaskModal),
       
@@ -237,12 +423,30 @@ export default {
 
 .columns {
   display: flex;
-  justify-content: space-between;
   padding: 1.5rem 1.5rem;
-  gap: 0.125rem;
   flex: 1;
   height: calc(100vh - 80px);
   overflow: hidden; /* Prevent container scrolling */
+  gap: 1rem; /* Default gap for multi-column layouts */
+}
+
+.columns .column {
+  flex: 1;
+  min-width: 0; /* Allow flex items to shrink below content size */
+}
+
+/* Mobile layout (<576px) - 1 column - no gap needed */
+.columns.layout-mobile {
+  gap: 0;
+  padding: 0.75rem;
+  justify-content: center;
+}
+
+.columns.layout-mobile .column {
+  flex: 1;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .no-board {
