@@ -93,9 +93,13 @@
         ghost-class="ghost-card"
         chosen-class="chosen"
         drag-class="dragging"
-        :delay="500"
+        :delay="300"
         :delayOnTouchOnly="true"
         :touchStartThreshold="5"
+        :scroll="true"
+        :scrollSensitivity="100"
+        :scrollSpeed="10"
+        :bubbleScroll="true"
         @end="onDragEnd"
         @change="onChange"
         @move="onMove"
@@ -210,6 +214,9 @@ export default {
     const onDragStart = (event) => {
       isDragging.value = true;
       
+      // Disable scrolling during drag on mobile
+      document.body.classList.add('is-dragging');
+      
       // First, let's store the original dimensions of the dragged element
       if (event.item) {
         const rect = event.item.getBoundingClientRect();
@@ -263,6 +270,9 @@ export default {
       isDraggingOver.value = false;
       isDragging.value = false;
       
+      // Re-enable scrolling on mobile
+      document.body.classList.remove('is-dragging');
+      
       // Clean up any DOM manipulations
       resetTaskStyling();
       
@@ -284,7 +294,21 @@ export default {
       // Handle added task (coming from another column)
       if (event.added) {
         const task = event.added.element;
-        const newStatus = column.value.id;
+        // For combined columns, use the currently selected status
+        // For backlog categories, use 'backlog' status
+        let newStatus = column.value.id;
+        if (isCombined.value && props.selectedCombinedColumn) {
+          // If it's a combined column, use the actual selected status
+          // Check if it's a backlog category (starts with 'backlog-')
+          if (props.selectedCombinedColumn.startsWith('backlog-')) {
+            newStatus = 'backlog';
+          } else {
+            newStatus = props.selectedCombinedColumn;
+          }
+        } else if (column.value.id === 'backlog') {
+          newStatus = 'backlog';
+        }
+        
         const newIndex = event.added.newIndex;
         
         emit('taskMoved', {
@@ -601,43 +625,67 @@ export default {
 .draggable-task-card {
   width: 100%;
   cursor: pointer;
-  touch-action: pan-y; /* Allow vertical scrolling on mobile, but support long-press drag */
+  touch-action: pan-y; /* Allow vertical scrolling on touch by default */
 }
 
-/* Initial selection doesn't have rotation */
+/* Touch device specific: Prevent document scrolling during drag, but allow column scrolling */
+@media (hover: none) {
+  body.is-dragging {
+    overflow: hidden; /* Prevent body scroll */
+  }
+
+  body.is-dragging .draggable-task-card {
+    touch-action: none !important; /* Prevent pull-to-refresh and other gestures */
+  }
+
+  /* Keep task-list scrollable during drag for auto-scroll to work */
+  body.is-dragging .task-list {
+    touch-action: pan-y !important; /* Allow vertical scrolling in the column */
+  }
+}
+
+/* Unified drag state for both desktop and touch */
+/* Original card when picked up: dotted outline, inner shadow, semi-transparent */
 .chosen {
+  opacity: 0.25 !important;
+  border: 2px dotted #6c6c84 !important;
+  box-shadow: inset 0 0 20px 10px rgba(0, 0, 0, 0.3) !important;
   cursor: grabbing;
-  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.4);
   z-index: 10;
-  background-color: #212130 !important;
-  border-color: #474756 !important;
+  transform: none !important; /* No rotation */
 }
 
-/* After delay, during actual dragging, apply rotation */
+/* Remove the separate dragging state - use chosen for everything */
 .dragging {
-  transform: rotate(-5deg) !important; /* Reduced rotation to 5 degrees */
+  opacity: 0.25 !important;
+  border: 2px dotted #6c6c84 !important;
+  box-shadow: inset 0 0 20px 10px rgba(0, 0, 0, 0.3) !important;
   cursor: grabbing;
-  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.4);
   z-index: 10;
-  background-color: #212130 !important;
-  border-color: #474756 !important;
+  transform: none !important; /* No rotation */
 }
 
-/* Preserve dimensions of the original card */
+/* Drop target placeholder: exact replica of card with draggable state styling */
 .ghost-card {
-  opacity: 1 !important;
-  background-color: transparent !important;
-  border: 2px dashed #6c6c84 !important;
+  opacity: 0.25 !important;
+  background-color: #1e1e2e !important; /* Keep card background visible */
+  border: 2px dotted #6c6c84 !important;
   border-radius: 6px !important;
-  box-shadow: none !important;
+  box-shadow: inset 0 0 20px 10px rgba(0, 0, 0, 0.3) !important;
   transform: none !important;
-  /* Remove fixed height and width to allow matching the original card */
   box-sizing: border-box;
 }
 
+/* Show content in ghost card at same opacity */
 .ghost-card * {
-  visibility: hidden !important;
+  visibility: visible !important;
+  opacity: 1 !important; /* Content inherits parent opacity */
+}
+
+/* Hide any floating clones - we only want in-place placeholders */
+.sortable-fallback {
   opacity: 0 !important;
+  visibility: hidden !important;
 }
 
 @media (hover: hover) {
