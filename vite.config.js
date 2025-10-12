@@ -9,7 +9,6 @@ export default defineConfig({
     vue(),
     tailwindcss(),
     VitePWA({
-      registerType: 'prompt',
       devOptions: {
         enabled: true
       },
@@ -68,8 +67,8 @@ export default defineConfig({
       },
       workbox: {
         cleanupOutdatedCaches: true,
-        skipWaiting: true,
-        clientsClaim: true,
+        skipWaiting: false,
+        clientsClaim: false,
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,

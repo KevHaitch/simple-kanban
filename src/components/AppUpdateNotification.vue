@@ -8,64 +8,60 @@
 </template>
 
 <script>
+const UPDATE_AVAILABLE_EVENT = 'pwa-update-available'
+
 export default {
   name: 'AppUpdateNotification',
   data() {
     return {
       showUpdateNotification: false,
-      registration: null,
-      updateCheckCompleted: false
+      updateSW: null
     }
   },
   mounted() {
-    // Delay the update check to avoid update loops
-    setTimeout(() => {
-      this.registerUpdateEvent()
-    }, 3000)
+    // Listen for update available event from main.js
+    window.addEventListener(UPDATE_AVAILABLE_EVENT, this.handleUpdateAvailable)
+    
+    // Also check if there's a waiting service worker on mount (in case update happened before mount)
+    this.checkForWaitingServiceWorker()
+  },
+  beforeUnmount() {
+    window.removeEventListener(UPDATE_AVAILABLE_EVENT, this.handleUpdateAvailable)
   },
   methods: {
-    registerUpdateEvent() {
+    handleUpdateAvailable(event) {
+      console.log('Update available event received')
+      this.updateSW = event.detail?.updateSW || window.__UPDATE_SW__
+      this.showUpdateNotification = true
+    },
+    
+    async checkForWaitingServiceWorker() {
+      // Check if there's already a waiting service worker
       if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.ready.then(registration => {
-          this.registration = registration
-          
-          // Only check for waiting worker once
-          if (registration.waiting && !this.updateCheckCompleted) {
-            this.showUpdateNotification = true
-            this.updateCheckCompleted = true
-          }
-          
-          // Listen for new updates
-          registration.addEventListener('updatefound', () => {
-            if (this.updateCheckCompleted) return
-            
-            const newWorker = registration.installing
-            newWorker.addEventListener('statechange', () => {
-              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                this.showUpdateNotification = true
-                this.updateCheckCompleted = true
-              }
-            })
-          })
-        })
+        const registration = await navigator.serviceWorker.ready
+        if (registration.waiting) {
+          console.log('Found waiting service worker on mount')
+          this.updateSW = window.__UPDATE_SW__
+          this.showUpdateNotification = true
+        }
       }
     },
+    
     async refreshApp() {
+      console.log('Refresh app clicked')
       this.showUpdateNotification = false
       
-      if (this.registration && this.registration.waiting) {
-        // Send message to service worker to skip waiting and activate new version
-        this.registration.waiting.postMessage({ type: 'SKIP_WAITING' })
-        
-        // Wait for the service worker to activate, then do a hard refresh
-        navigator.serviceWorker.addEventListener('controllerchange', () => {
-          // Hard refresh to bypass cache and load new version
-          window.location.href = window.location.href
-        }, { once: true })
+      // Call the updateSW function provided by vite-plugin-pwa
+      if (this.updateSW) {
+        console.log('Calling updateSW to activate new service worker')
+        await this.updateSW(true) // true = reload page after activation
+      } else if (window.__UPDATE_SW__) {
+        console.log('Using global updateSW')
+        await window.__UPDATE_SW__(true)
       } else {
-        // If no waiting service worker, do a hard refresh immediately
-        // Using location.href assignment forces a full page reload bypassing cache
-        window.location.href = window.location.href + '?v=' + Date.now()
+        // Fallback: just reload the page
+        console.log('No updateSW available, doing hard reload')
+        window.location.reload()
       }
     }
   }
