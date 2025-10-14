@@ -27,6 +27,10 @@ export default {
 <style scoped lang="css">
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap');
 
+/* ============================================
+   BASE STYLES (Mobile First - <576px)
+   ============================================ */
+
 .landing-container {
   display: flex;
   flex-direction: column;
@@ -42,27 +46,28 @@ export default {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 2rem;
+  padding: 1.5rem;
   text-align: center;
   max-width: 1200px;
   width: 100%;
 }
 
 .logo {
-  width: 280px;
+  width: 160px;
   height: auto;
-  margin-bottom: 6rem;
-  margin-top: -4rem;
-  margin-left: -1rem;
+  margin-bottom: 2.5rem;
+  margin-top: -2rem;
+  margin-left: 0;
 }
 
 .tagline {
   font-family: 'Poppins', sans-serif;
-  font-size: 5rem;
+  font-size: 2rem;
   line-height: 1.2;
   font-weight: 600;
-  margin-bottom: 6rem;
+  margin-bottom: 2.5rem;
   color: #e6e6e9;
+  max-width: 960px;
 }
 
 .sign-in-btn {
@@ -81,7 +86,7 @@ export default {
   box-shadow: 0 1px 3px rgba(0,0,0,0.12);
   transition: all 0.2s ease;
   cursor: pointer;
-  margin-bottom: 6rem;
+  margin-bottom: 3rem;
 }
 
 .sign-in-btn:hover {
@@ -95,17 +100,82 @@ export default {
   margin-right: 10px;
 }
 
-@media (max-width: 768px) {
+/* ============================================
+   RESPONSIVE BREAKPOINTS (Mobile First)
+   ============================================ */
+
+/* Small (≥576px) */
+@media (min-width: 576px) {
+  .logo {
+    width: 200px;
+    margin-bottom: 3rem;
+  }
+  
   .tagline {
     font-size: 2.5rem;
+    margin-bottom: 3rem;
+  }
+  
+  .sign-in-btn {
+    margin-bottom: 4rem;
+  }
+}
+
+/* Medium (≥768px) */
+@media (min-width: 768px) {
+  .content {
+    padding: 2rem;
   }
   
   .logo {
-    width: 180px;
+    width: 240px;
+    margin-bottom: 4rem;
+    margin-top: -3rem;
   }
   
-  .logo, .tagline, .sign-in-btn {
-    margin-bottom: 3rem;
+  .tagline {
+    font-size: 3.5rem;
+    margin-bottom: 4rem;
+  }
+  
+  .sign-in-btn {
+    margin-bottom: 5rem;
+  }
+}
+
+/* Large (≥992px) */
+@media (min-width: 992px) {
+  .logo {
+    width: 260px;
+    margin-bottom: 5rem;
+  }
+  
+  .tagline {
+    font-size: 4.25rem;
+    margin-bottom: 5rem;
+  }
+  
+  .sign-in-btn {
+    margin-bottom: 5.5rem;
+  }
+}
+
+/* Extra Large (≥1200px) */
+@media (min-width: 1200px) {
+  .logo {
+    width: 280px;
+    margin-bottom: 6rem;
+    margin-top: -4rem;
+    margin-left: -1rem;
+  }
+  
+  .tagline {
+    font-size: 5rem;
+    margin-bottom: 6rem;
+  }
+  
+  .sign-in-btn {
+    margin-bottom: 6rem;
   }
 }
 </style>
