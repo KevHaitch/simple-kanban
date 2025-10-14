@@ -2,7 +2,7 @@
   <div class="landing-container">
     <div class="content">
       <img :src="logo" alt="Kaiborg Logo" class="logo" />
-      <h1 class="tagline">Stupid simple kanbans for continuous improvement</h1>
+      <h1 class="tagline">Stupid simple kanbans for small dev teams</h1>
       <button @click="$emit('sign-in')" class="sign-in-btn">
         <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/google/google-original.svg" class="google-icon" alt="Google" />
         Sign in with Google

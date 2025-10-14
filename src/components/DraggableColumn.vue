@@ -696,16 +696,36 @@ export default {
 
 /* Hide floating ghost on touch - only show outlines */
 @media (hover: none) {
-  .sortable-fallback,
+  .sortable-fallback {
+    opacity: 0 !important;
+    visibility: hidden !important;
+    display: none !important;
+  }
+  
   .dragging {
     opacity: 0 !important;
     visibility: hidden !important;
     display: none !important;
   }
+  
+  /* Ensure chosen and ghost-card stay visible on touch */
+  .chosen,
+  .ghost-card {
+    display: block !important;
+    visibility: visible !important;
+  }
 }
 
 /* Desktop: floating ghost matches other ghost styling */
 @media (hover: hover) {
+  /* Ensure all drag elements are visible on desktop */
+  .chosen,
+  .dragging,
+  .ghost-card {
+    display: block !important;
+    visibility: visible !important;
+  }
+  
   .sortable-fallback {
     opacity: 0.5 !important;
     border: 2px dotted #6c6c84 !important;
